@@ -57,7 +57,7 @@ def group_fix_message(*, detail: str = "") -> str:
     extra = f"\n\n<i>{detail}</i>" if detail else ""
     return (
         f"{banner('ULANISH XATOSI', icon='⚠️')}\n\n"
-        block_quote("Guruhga yuborib bo‘lmadi") + "\n\n"
+        f"{block_quote('Guruhga yuborib bo‘lmadi')}\n\n"
         "<b>Telegram «chat not found» degani:</b>\n"
         "• <code>GROUP_ID</code> noto‘g‘ri (shaxsiy ID emas!)\n"
         "• Bot guruhda yo‘q\n"
