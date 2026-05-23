@@ -7,7 +7,7 @@ from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 
-from config import has_admins, is_admin, railway_setup_hint, settings
+from config import get_group_id, has_admins, is_admin, railway_setup_hint, settings
 from services.group_check import GroupConfigError, group_fix_message, parse_group_id_hint, verify_group_access
 from db import get_active_session
 from keyboards import masul_main_menu
@@ -74,10 +74,18 @@ async def cmd_check_group(message: Message, bot: Bot) -> None:
         return
     try:
         title = await verify_group_access(bot)
+        cfg = settings()["group_id"]
+        resolved = get_group_id()
+        fix = ""
+        if resolved and cfg and resolved != cfg:
+            fix = (
+                f"\n\n💡 Railway da yangilang:\n"
+                f"<code>GROUP_ID={resolved}</code>"
+            )
         await message.answer(
             f"✅ <b>Guruh topildi</b>\n\n"
             f"📛 <b>{title}</b>\n"
-            f"{parse_group_id_hint()}\n\n"
+            f"{parse_group_id_hint()}{fix}\n\n"
             "Endi <b>🚚 Юк келди</b> ishlashi kerak.",
             parse_mode="HTML",
         )

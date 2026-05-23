@@ -29,10 +29,33 @@ def _parse_group_id(raw: str) -> int | None:
         return None
 
 
+_resolved_group_id: int | None = None
+
+
+def get_group_id() -> int | None:
+    """Yuborish uchun guruh ID (avto-supergroup tuzatishdan keyin)."""
+    if _resolved_group_id is not None:
+        return _resolved_group_id
+    return settings()["group_id"]
+
+
+def set_resolved_group_id(group_id: int) -> None:
+    global _resolved_group_id
+    _resolved_group_id = int(group_id)
+
+
+def _resolve_group_id_from_env() -> int | None:
+    for key in ("GROUP_ID", "GROUP_CHAT_ID", "CHAT_ID", "TELEGRAM_GROUP_ID"):
+        val = _parse_group_id(os.getenv(key) or "")
+        if val is not None:
+            return val
+    return None
+
+
 @lru_cache(maxsize=1)
 def settings():
     token = (os.getenv("BOT_TOKEN") or "").strip()
-    group_id = _parse_group_id(os.getenv("GROUP_ID") or "")
+    group_id = _resolve_group_id_from_env()
     admin_ids = _parse_ids(os.getenv("ADMIN_IDS") or os.getenv("ADMIN_ID") or "")
     db_path = (os.getenv("DB_PATH") or "yuk_bot.db").strip() or "yuk_bot.db"
     tz = (os.getenv("TZ") or "Asia/Tashkent").strip() or "Asia/Tashkent"

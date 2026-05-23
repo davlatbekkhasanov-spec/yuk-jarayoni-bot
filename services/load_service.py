@@ -8,7 +8,7 @@ from typing import Any
 from aiogram import Bot
 from aiogram.types import InputMediaPhoto
 
-from config import settings
+from config import get_group_id, settings
 from services.group_check import GroupConfigError, verify_group_access
 from db import (
     get_active_session,
@@ -27,11 +27,10 @@ async def publish_load_to_group(bot: Bot, session_id: int) -> None:
     session = get_session(session_id)
     if not session:
         raise ValueError("session not found")
-    group_id = settings()["group_id"]
+    await verify_group_access(bot)
+    group_id = get_group_id()
     if not group_id:
         raise GroupConfigError("GROUP_ID sozlanmagan")
-
-    await verify_group_access(bot)
 
     media = [
         InputMediaPhoto(
@@ -124,7 +123,7 @@ async def publish_final_report(bot: Bot, session_id: int) -> None:
     session = get_session(session_id)
     if not session:
         return
-    group_id = session.get("group_chat_id") or settings()["group_id"]
+    group_id = session.get("group_chat_id") or get_group_id()
     if not group_id:
         return
 
