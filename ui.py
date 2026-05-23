@@ -207,7 +207,7 @@ def group_load_card(
     else:
         footer_live = f"  ·  {pulse} <b>LIVE</b>"
     lines.extend(
-        ["", sep(), f"<i>🕐 {he(display_now())}{footer_live}  ·  {he(BRAND)}</i>"]
+        ["", sep(), f"<i>🕐 {he(display_now())}{footer_live}</i>"]
     )
     return "\n".join(lines)
 
@@ -251,7 +251,6 @@ def kaizen_summary_compact(m: KaizenMetrics) -> str:
         f"{sep()}\n"
         f"📊  <b>KAIZEN</b>\n"
         f"⏱  Jami tushirish: <b>{format_duration(m.cycle_sec)}</b>\n"
-        f"👤  O'rtacha / xodim: <b>{avg_minutes(m.avg_work_sec)}</b>\n"
         f"👷  Jamoa ish vaqti: <b>{format_duration(m.total_work_sec)}</b>\n"
         f"☕  Tanaffus: <b>{format_duration(m.total_pause_sec)}</b>"
     )
@@ -261,7 +260,6 @@ def kaizen_block(m: KaizenMetrics) -> str:
     return (
         f"{banner('KAIZEN  ·  YAKUNIY TAHLIL', icon='📊', width=26)}\n\n"
         f"{metric_card('⏱', 'Jami tushirish vaqti', format_duration(m.cycle_sec))}\n\n"
-        f"{metric_card('👤', 'Bir xodim o\'rtacha', avg_minutes(m.avg_work_sec))}\n\n"
         f"{metric_card('👷', 'Jamoa jami ish vaqti', format_duration(m.total_work_sec))}\n\n"
         f"{metric_card('☕', 'Tanaffus', format_duration(m.total_pause_sec))}\n\n"
         f"🏅  <b>Eng tez:</b> {he(m.fastest_name)} — {format_duration(m.fastest_sec)}\n"
@@ -322,8 +320,7 @@ def report_caption_short(session: dict[str, Any], participants: list) -> str:
     return (
         f"🏁  <b>YAKUN SURATLARI</b>  ·  #{session['id']}\n"
         f"{sep()}\n"
-        f"⏱  Jami: <b>{format_duration(m.cycle_sec)}</b>  ·  "
-        f"👤  O'rtacha: <b>{avg_minutes(m.avg_work_sec)}</b>"
+        f"⏱  Jami: <b>{format_duration(m.cycle_sec)}</b>"
     )
 
 

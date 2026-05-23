@@ -16,13 +16,11 @@ from db import (
     list_participants,
     update_session,
 )
-from kaizen import compute_kaizen
 from keyboards import group_join_closed, group_join_keyboard, personal_timer_keyboard
 from services.group_check import GroupConfigError, verify_group_access
 from time_util import now_iso
 from ui import (
     group_load_card,
-    kaizen_block,
     media_caption_end,
     media_caption_start,
     personal_timer_card,
@@ -117,46 +115,28 @@ def _build_end_album(session: dict[str, Any]) -> list[InputMediaPhoto]:
     return media
 
 
-async def _send_end_album_threaded(
+async def _send_end_album(
     bot: Bot,
     *,
     chat_id: int,
     session: dict[str, Any],
     session_id: int,
 ) -> None:
-    """
-    Yakun suratlari — albom, aniq reply zanjiri:
-    status SMS → qisqa matn (reply) → suratlar albomi (reply).
-    """
+    """Yakun 2 surat — albom, statusdan keyin to'g'ridan-to'g'ri (ko'rinadi)."""
     end_album = _build_end_album(session)
     if not end_album:
         log.warning("session %s: yakun suratlari yo'q", session_id)
         return
 
-    status_id = session.get("group_status_msg_id")
-    album_id = _album_first_id(session)
-    targets: list[int | None] = [status_id, album_id]
+    end_album[0].caption = f"🏁  <b>YAKUN</b>  ·  #{session_id}"
+    end_album[0].parse_mode = "HTML"
+    if len(end_album) > 1:
+        end_album[1].caption = None
 
-    anchor = await _send_with_reply_chain(
-        bot,
-        chat_id=chat_id,
-        reply_targets=targets,
-        send_fn=bot.send_message,
-        text=f"🏁  <b>Yakun suratlari</b>  ·  #{session_id}",
-        parse_mode="HTML",
-    )
-    anchor_id = anchor.message_id
-
-    async def _send_album(**kw: Any) -> Message:
-        msgs = await bot.send_media_group(chat_id=chat_id, media=end_album[:10], **kw)
-        return msgs[0]
-
-    await _send_with_reply_chain(
-        bot,
-        chat_id=chat_id,
-        reply_targets=[anchor_id, status_id, album_id],
-        send_fn=_send_album,
-    )
+    try:
+        await bot.send_media_group(chat_id=chat_id, media=end_album[:10])
+    except Exception as e:
+        log.error("yakun albom yuborilmadi session %s: %s", session_id, e)
 
 
 async def publish_load_to_group(bot: Bot, session_id: int) -> None:
@@ -283,29 +263,17 @@ async def publish_final_report(bot: Bot, session_id: int) -> None:
 
     participants = list_participants(session_id)
     finished_iso = session.get("finished_at") or now_iso()
-    m = compute_kaizen(
-        session=session, participants=participants, finished_iso=finished_iso
-    )
 
     await refresh_group_status(bot, session_id, phase="completed")
     session = get_session(session_id) or session
 
-    await _send_end_album_threaded(
+    await _send_end_album(
         bot, chat_id=group_id, session=session, session_id=session_id
     )
 
-    report_text = (
-        f"{ranking_block(participants, finished_iso=finished_iso)}\n\n"
-        f"{kaizen_block(m)}"
-    )
-    status_id = session.get("group_status_msg_id")
-    album_id = _album_first_id(session)
-
-    await _send_with_reply_chain(
-        bot,
+    report_text = ranking_block(participants, finished_iso=finished_iso)
+    await bot.send_message(
         chat_id=group_id,
-        reply_targets=[status_id, album_id],
-        send_fn=bot.send_message,
         text=report_text,
         parse_mode="HTML",
     )
