@@ -4,7 +4,7 @@ Telegram bot — yuk kelishi, qatnashuvchilar, live tаймер va avtomatik otc
 
 ## Oqim
 
-1. **Mas'ul** (shaxsiy chat): `🚚 Юк келди` → mashina foto → tushirish joyi foto  
+1. **Mas'ul** (shaxsiy chat): `🚚 Юк келди` → mashina → **қўшимча расм**  
 2. **Guruh**: albom + `✅ Қатнашиш`  
 3. **Ishchilar**: tugma → shaxsiy chatda tаймер  
 4. **Mas'ul**: `🏁 Якунлаш` → 2 ta oxirgi foto → **отчёт** guruhga  
@@ -19,6 +19,11 @@ python bot.py
 ```
 
 Guruhda bot **admin** bo‘lishi kerak (xabarlarni tahrirlash uchun).
+
+### Ko‘p mas'ul (Railway shart emas)
+
+Asosiy admin: `➕ Масъул қўшиш` — ID forward/reply.  
+Ularda `🚚 Юк келди` va `🏁 Якунлаш` ochiladi.
 
 ## Fayl tuzilmasi
 

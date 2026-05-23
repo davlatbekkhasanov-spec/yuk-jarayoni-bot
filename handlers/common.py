@@ -11,6 +11,7 @@ from config import get_group_id, has_admins, is_admin, railway_setup_hint, setti
 from services.group_check import GroupConfigError, group_fix_message, parse_group_id_hint, verify_group_access
 from db import get_active_session
 from keyboards import masul_main_menu
+from roles import can_manage_yuk
 from ui import masul_welcome
 
 router = Router()
@@ -27,20 +28,24 @@ async def cmd_start(message: Message, state: FSMContext) -> None:
         await message.answer(railway_setup_hint(uid), parse_mode="HTML")
         return
 
-    if is_admin(uid):
+    if can_manage_yuk(uid):
         active = get_active_session()
         can_finish = bool(active and active.get("status") == "active")
         await message.answer(
             masul_welcome(name),
             parse_mode="HTML",
-            reply_markup=masul_main_menu(can_finish=can_finish),
+            reply_markup=masul_main_menu(
+                can_finish=can_finish,
+                show_staff=is_admin(uid),
+            ),
         )
         return
 
     await message.answer(
         "👋 <b>Юк жараёни боти</b>\n\n"
-        "Гуруҳда <b>✅ Қатнашиш</b> tugmasini bosing — shaxsiy tаймерingiz ochiladi.\n\n"
-        "<i>Mas'ul: botga /start (admin ID sozlangan bo‘lishi kerak)</i>",
+        "Гуруҳда <b>✅ Қатнашиш</b> — ish vaqti va tanaffus.\n\n"
+        "<i>Юк ochish/yakunlash: admin sizni «масъул» qiladi — "
+        "ID yuborish shart emas, Railway ham emas.</i>",
         parse_mode="HTML",
     )
 
@@ -66,7 +71,7 @@ async def cmd_id(message: Message) -> None:
 @router.message(Command("guruh"))
 async def cmd_check_group(message: Message, bot: Bot) -> None:
     """Mas'ul: GROUP_ID to‘g‘riligini tekshiradi."""
-    if not is_admin(message.from_user.id if message.from_user else None):
+    if not can_manage_yuk(message.from_user.id if message.from_user else None):
         await message.answer("⚠️ Faqat mas'ul uchun.", parse_mode="HTML")
         return
     if message.chat.type != "private":
@@ -106,12 +111,15 @@ async def ui_cancel(callback: CallbackQuery, state: FSMContext) -> None:
         "❌ <b>Бекор қилинди</b>",
         parse_mode="HTML",
     )
-    if is_admin(callback.from_user.id):
+    if can_manage_yuk(callback.from_user.id):
         active = get_active_session()
         can_finish = bool(active and active.get("status") == "active")
         await callback.message.answer(
             "Menyuga qaytdingiz.",
-            reply_markup=masul_main_menu(can_finish=can_finish),
+            reply_markup=masul_main_menu(
+                can_finish=can_finish,
+                show_staff=is_admin(callback.from_user.id),
+            ),
         )
     await callback.answer()
 

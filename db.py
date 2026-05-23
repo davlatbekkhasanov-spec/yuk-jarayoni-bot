@@ -42,6 +42,13 @@ CREATE TABLE IF NOT EXISTS participants (
 
 CREATE INDEX IF NOT EXISTS idx_sessions_status ON load_sessions(status);
 CREATE INDEX IF NOT EXISTS idx_participants_session ON participants(session_id);
+
+CREATE TABLE IF NOT EXISTS operators (
+    user_id INTEGER PRIMARY KEY,
+    user_name TEXT NOT NULL,
+    added_at TEXT NOT NULL,
+    added_by INTEGER
+);
 """
 
 
@@ -74,10 +81,30 @@ def _migrate_participants(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE participants ADD COLUMN paused_at TEXT")
 
 
+def _seed_operators_from_env(conn: sqlite3.Connection) -> None:
+    import os
+    from config import _parse_ids
+    from time_util import now_iso
+
+    raw = os.getenv("MASUL_IDS") or os.getenv("OPERATOR_IDS") or ""
+    for uid in _parse_ids(raw):
+        try:
+            conn.execute(
+                """
+                INSERT OR IGNORE INTO operators (user_id, user_name, added_at, added_by)
+                VALUES (?, ?, ?, NULL)
+                """,
+                (uid, f"ID {uid}", now_iso()),
+            )
+        except sqlite3.Error:
+            pass
+
+
 def init_db() -> None:
     with db() as conn:
         conn.executescript(SCHEMA)
         _migrate_participants(conn)
+        _seed_operators_from_env(conn)
 
 
 def row_to_dict(row: sqlite3.Row | None) -> dict[str, Any] | None:
@@ -249,6 +276,49 @@ def participant_exists(session_id: int, user_id: int) -> bool:
             (session_id, user_id),
         ).fetchone()
         return row is not None
+
+
+def is_operator(user_id: int) -> bool:
+    with db() as conn:
+        row = conn.execute(
+            "SELECT 1 FROM operators WHERE user_id=?", (int(user_id),)
+        ).fetchone()
+        return row is not None
+
+
+def list_operators() -> list[dict[str, Any]]:
+    with db() as conn:
+        rows = conn.execute(
+            "SELECT * FROM operators ORDER BY added_at ASC"
+        ).fetchall()
+        return [row_to_dict(r) for r in rows]
+
+
+def add_operator(*, user_id: int, user_name: str, added_by: int | None) -> bool:
+    from time_util import now_iso
+
+    with db() as conn:
+        try:
+            conn.execute(
+                """
+                INSERT INTO operators (user_id, user_name, added_at, added_by)
+                VALUES (?, ?, ?, ?)
+                """,
+                (user_id, user_name, now_iso(), added_by),
+            )
+            return True
+        except sqlite3.IntegrityError:
+            conn.execute(
+                "UPDATE operators SET user_name=? WHERE user_id=?",
+                (user_name, user_id),
+            )
+            return False
+
+
+def remove_operator(user_id: int) -> bool:
+    with db() as conn:
+        cur = conn.execute("DELETE FROM operators WHERE user_id=?", (int(user_id),))
+        return cur.rowcount > 0
 
 
 def cancel_draft_session(session_id: int) -> None:

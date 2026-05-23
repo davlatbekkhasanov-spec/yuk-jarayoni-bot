@@ -41,7 +41,7 @@ async def publish_load_to_group(bot: Bot, session_id: int) -> None:
         ),
         InputMediaPhoto(
             media=session["unload_photo_start"],
-            caption="📍 <b>Тушириш жойи</b> — бошланиш",
+            caption="➕ <b>Қўшимча расм</b> — бошланиш",
             parse_mode="HTML",
         ),
     ]
@@ -145,13 +145,17 @@ async def publish_final_report(bot: Bot, session_id: int) -> None:
         )
     if session.get("unload_photo_start"):
         media.append(
-            InputMediaPhoto(media=session["unload_photo_start"], caption="📍 Бошланиш — жой")
+            InputMediaPhoto(
+                media=session["unload_photo_start"], caption="➕ Бошланиш — қўшимча"
+            )
         )
     if session.get("car_photo_end"):
         media.append(InputMediaPhoto(media=session["car_photo_end"], caption="🚛 Якун — машина"))
     if session.get("unload_photo_end"):
         media.append(
-            InputMediaPhoto(media=session["unload_photo_end"], caption="📍 Якун — жой")
+            InputMediaPhoto(
+                media=session["unload_photo_end"], caption="➕ Якун — қўшимча"
+            )
         )
 
     if media:

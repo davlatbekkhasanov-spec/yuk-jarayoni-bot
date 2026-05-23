@@ -12,15 +12,23 @@ from aiogram.types import (
 from callbacks import FinishCb, JoinCb, PauseCb
 
 
-def masul_main_menu(*, can_finish: bool) -> ReplyKeyboardMarkup:
+def masul_main_menu(*, can_finish: bool, show_staff: bool = False) -> ReplyKeyboardMarkup:
     row2 = [KeyboardButton(text="📊 Ҳолат")]
     if can_finish:
         row2.append(KeyboardButton(text="🏁 Якунлаш"))
+    keyboard = [
+        [KeyboardButton(text="🚚 Юк келди")],
+        row2,
+    ]
+    if show_staff:
+        keyboard.append(
+            [
+                KeyboardButton(text="👥 Масъуллар"),
+                KeyboardButton(text="➕ Масъул қўшиш"),
+            ]
+        )
     return ReplyKeyboardMarkup(
-        keyboard=[
-            [KeyboardButton(text="🚚 Юк келди")],
-            row2,
-        ],
+        keyboard=keyboard,
         resize_keyboard=True,
         input_field_placeholder="Menyudan tanlang…",
     )

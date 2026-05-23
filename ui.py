@@ -40,7 +40,7 @@ def masul_welcome(name: str) -> str:
         f"{sep()}\n"
         "🚚 <b>Юк жараёни</b> — масъул панели\n\n"
         "📌 <b>Қадамлар:</b>\n"
-        "1️⃣ <b>Юк келди</b> — машина ва тушириш жойи фотоси\n"
+        "1️⃣ <b>Юк келди</b> — машина + <b>қўшимча расм</b>\n"
         "2️⃣ Гуруҳга хабар кетади, болалар <b>Қатнашиш</b> босади\n"
         "3️⃣ Таймер + <b>⏸ Танaffus</b> / <b>▶️ Давом этиш</b>\n"
         "4️⃣ <b>Якунлаш</b> — охирги фотолар ва автоматик отчёт\n\n"
@@ -196,13 +196,31 @@ def final_report(
         [
             "<code>└────────────────────────</code>",
             "",
-            "📸 <b>Бошланиш:</b> машина + тушириш жойи",
-            "📸 <b>Якун:</b> машина + тушириш жойи",
+            "📸 <b>Бошланиш:</b> машина + қўшимча расм",
+            "📸 <b>Якун:</b> машина + қўшимча расм",
             "",
             sep(),
             "✅ <b>Юк жараёни тугади</b>",
         ]
     )
+    return "\n".join(lines)
+
+
+def operators_list_text(operators: list[dict[str, Any]]) -> str:
+    lines = [
+        "👥 <b>Юк масъуллари</b>",
+        "<i>Юк келди / якунлаш huquqi. Railway ga qo‘shilmaydi.</i>",
+        "",
+    ]
+    if not operators:
+        lines.append("<i>Hali mas'ul yo‘q — «➕ Масъул қўшиш»</i>")
+    else:
+        for i, op in enumerate(operators, 1):
+            lines.append(
+                f"{i}. <b>{he(op.get('user_name'))}</b> — "
+                f"<code>{op.get('user_id')}</code>"
+            )
+    lines.append(f"\n<i>🕐 {he(display_now())}</i>")
     return "\n".join(lines)
 
 

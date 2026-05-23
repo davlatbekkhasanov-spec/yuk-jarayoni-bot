@@ -16,3 +16,7 @@ class FinishCb(CallbackData, prefix="fn"):
 class PauseCb(CallbackData, prefix="ps"):
     session_id: int
     action: str  # pause | resume
+
+
+class OpRmCb(CallbackData, prefix="op"):
+    user_id: int
