@@ -7,7 +7,7 @@ from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 
-from config import is_admin, settings
+from config import has_admins, is_admin, railway_setup_hint, settings
 from db import get_active_session
 from keyboards import masul_main_menu
 from ui import masul_welcome
@@ -20,7 +20,13 @@ async def cmd_start(message: Message, state: FSMContext) -> None:
     await state.clear()
     name = message.from_user.full_name if message.from_user else "Foydalanuvchi"
 
-    if is_admin(message.from_user.id if message.from_user else None):
+    uid = message.from_user.id if message.from_user else None
+
+    if not has_admins() and message.chat.type == "private" and uid:
+        await message.answer(railway_setup_hint(uid), parse_mode="HTML")
+        return
+
+    if is_admin(uid):
         active = get_active_session()
         can_finish = bool(active and active.get("status") == "active")
         await message.answer(
@@ -40,9 +46,16 @@ async def cmd_start(message: Message, state: FSMContext) -> None:
 
 @router.message(Command("id"))
 async def cmd_id(message: Message) -> None:
+    uid = message.from_user.id if message.from_user else "—"
+    extra = ""
+    if message.chat.type == "private" and not has_admins() and uid != "—":
+        extra = (
+            f"\n\n⚙️ Railway uchun:\n"
+            f"<code>ADMIN_ID={uid}</code>"
+        )
     await message.answer(
         f"📌 <b>Chat ID</b>\n<code>{message.chat.id}</code>\n\n"
-        f"👤 <b>Sizning ID</b>\n<code>{message.from_user.id if message.from_user else '—'}</code>",
+        f"👤 <b>Sizning ID</b>\n<code>{uid}</code>{extra}",
         parse_mode="HTML",
     )
 
@@ -71,9 +84,6 @@ async def ui_cancel(callback: CallbackQuery, state: FSMContext) -> None:
 
 
 def ensure_configured() -> str | None:
-    s = settings()
-    if not s["token"]:
+    if not settings()["token"]:
         return "BOT_TOKEN sozlanmagan"
-    if not s["admin_ids"]:
-        return "ADMIN_ID yoki ADMIN_IDS sozlanmagan"
     return None

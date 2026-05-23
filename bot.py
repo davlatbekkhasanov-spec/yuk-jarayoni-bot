@@ -15,7 +15,7 @@ from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 from aiogram.fsm.storage.memory import MemoryStorage
 
-from config import settings
+from config import settings, startup_warnings
 from db import init_db
 from handlers import setup_routers
 from handlers.common import ensure_configured
@@ -33,6 +33,9 @@ async def main() -> None:
     if err:
         log.error("%s", err)
         sys.exit(1)
+
+    for warn in startup_warnings():
+        log.warning(warn)
 
     init_db()
     cfg = settings()

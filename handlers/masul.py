@@ -9,7 +9,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 
 from callbacks import FinishCb
-from config import is_admin, settings
+from config import has_admins, is_admin, railway_setup_hint, settings
 from db import (
     create_session,
     get_active_session,
@@ -31,9 +31,21 @@ def _admin_only(message: Message) -> bool:
     return is_admin(message.from_user.id if message.from_user else None)
 
 
+async def _require_masul(message: Message) -> bool:
+    uid = message.from_user.id if message.from_user else None
+    if not has_admins():
+        if uid:
+            await message.answer(railway_setup_hint(uid), parse_mode="HTML")
+        return False
+    if not is_admin(uid):
+        await message.answer("⚠️ Bu bo‘lim faqat <b>mas'ul</b> uchun.", parse_mode="HTML")
+        return False
+    return True
+
+
 @router.message(F.text == "🚚 Юк келди", F.chat.type == "private")
 async def start_load_flow(message: Message, state: FSMContext) -> None:
-    if not _admin_only(message):
+    if not await _require_masul(message):
         return
 
     if not settings()["group_id"]:
@@ -75,7 +87,7 @@ async def start_load_flow(message: Message, state: FSMContext) -> None:
 
 @router.message(LoadStartStates.car_photo, F.photo, F.chat.type == "private")
 async def start_car_photo(message: Message, state: FSMContext) -> None:
-    if not _admin_only(message):
+    if not await _require_masul(message):
         return
     data = await state.get_data()
     sid = data.get("session_id")
@@ -96,7 +108,7 @@ async def start_car_photo(message: Message, state: FSMContext) -> None:
 
 @router.message(LoadStartStates.unload_photo, F.photo, F.chat.type == "private")
 async def start_unload_photo(message: Message, state: FSMContext, bot: Bot) -> None:
-    if not _admin_only(message):
+    if not await _require_masul(message):
         return
     data = await state.get_data()
     sid = int(data.get("session_id"))
@@ -126,7 +138,7 @@ async def start_unload_photo(message: Message, state: FSMContext, bot: Bot) -> N
 
 @router.message(F.text == "📊 Ҳолат", F.chat.type == "private")
 async def status_panel(message: Message) -> None:
-    if not _admin_only(message):
+    if not await _require_masul(message):
         return
     active = get_active_session()
     parts = list_participants(active["id"]) if active else []
@@ -141,7 +153,7 @@ async def status_panel(message: Message) -> None:
 
 @router.message(F.text == "🏁 Якунлаш", F.chat.type == "private")
 async def finish_prompt(message: Message) -> None:
-    if not _admin_only(message):
+    if not await _require_masul(message):
         return
     active = get_active_session()
     if not active or active.get("status") != "active":
@@ -202,7 +214,7 @@ async def finish_cancel(callback: CallbackQuery) -> None:
 
 @router.message(LoadFinishStates.car_photo, F.photo, F.chat.type == "private")
 async def finish_car_photo(message: Message, state: FSMContext) -> None:
-    if not _admin_only(message):
+    if not await _require_masul(message):
         return
     data = await state.get_data()
     sid = data.get("session_id")
@@ -217,7 +229,7 @@ async def finish_car_photo(message: Message, state: FSMContext) -> None:
 
 @router.message(LoadFinishStates.unload_photo, F.photo, F.chat.type == "private")
 async def finish_unload_photo(message: Message, state: FSMContext, bot: Bot) -> None:
-    if not _admin_only(message):
+    if not await _require_masul(message):
         return
     data = await state.get_data()
     sid = int(data.get("session_id"))
@@ -238,7 +250,7 @@ async def finish_unload_photo(message: Message, state: FSMContext, bot: Bot) -> 
 @router.message(LoadFinishStates.car_photo)
 @router.message(LoadFinishStates.unload_photo)
 async def expect_photo(message: Message) -> None:
-    if not _admin_only(message):
+    if not await _require_masul(message):
         return
     await message.answer(
         "📸 Iltimos, <b>foto</b> yuboring (hujjat emas).",

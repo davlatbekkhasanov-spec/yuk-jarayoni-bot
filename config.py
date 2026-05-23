@@ -41,4 +41,31 @@ def settings():
 def is_admin(user_id: int | None) -> bool:
     if user_id is None:
         return False
+    if not settings()["admin_ids"]:
+        return False
     return int(user_id) in settings()["admin_ids"]
+
+
+def has_admins() -> bool:
+    return bool(settings()["admin_ids"])
+
+
+def startup_warnings() -> list[str]:
+    s = settings()
+    warnings: list[str] = []
+    if not s["admin_ids"]:
+        warnings.append("ADMIN_ID yoki ADMIN_IDS sozlanmagan — mas'ul funksiyalari o‘chiq")
+    if not s["group_id"]:
+        warnings.append("GROUP_ID sozlanmagan — guruhga e’lon yuborilmaydi")
+    return warnings
+
+
+def railway_setup_hint(user_id: int) -> str:
+    return (
+        "⚙️ <b>Bot sozlash kerak</b>\n\n"
+        "Railway → <b>Variables</b> ga qo‘shing:\n\n"
+        f"<code>ADMIN_ID={user_id}</code>\n"
+        "<code>GROUP_ID=...</code> <i>(guruhda /id)</i>\n"
+        "<code>BOT_TOKEN=...</code>\n\n"
+        "Saqlang → <b>Redeploy</b> → botda qayta /start"
+    )
