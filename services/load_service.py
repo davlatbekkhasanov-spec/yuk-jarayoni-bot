@@ -22,10 +22,14 @@ from time_util import now_iso
 from ui import (
     final_report,
     group_load_card,
+    kaizen_block,
     media_caption_end,
     media_caption_start,
     personal_timer_card,
+    ranking_block,
+    report_caption_short,
 )
+from kaizen import compute_kaizen
 
 log = logging.getLogger(__name__)
 
@@ -139,7 +143,9 @@ async def publish_final_report(bot: Bot, session_id: int) -> None:
         return
 
     participants = list_participants(session_id)
-    report_text = final_report(session=session, participants=participants)
+    finished_iso = session.get("finished_at") or now_iso()
+    report_full = final_report(session=session, participants=participants)
+    caption_short = report_caption_short(session, participants)
 
     media = []
     if session.get("car_photo_start"):
@@ -176,13 +182,36 @@ async def publish_final_report(bot: Bot, session_id: int) -> None:
         )
 
     if media:
-        media[0].caption = report_text
+        media[0].caption = caption_short[:1020]
         media[0].parse_mode = "HTML"
         await bot.send_media_group(chat_id=group_id, media=media[:10])
     else:
         await bot.send_message(
             chat_id=group_id,
-            text=report_text,
+            text=caption_short,
+            parse_mode="HTML",
+        )
+
+    if len(report_full) > 4000:
+        m = compute_kaizen(
+            session=session,
+            participants=participants,
+            finished_iso=finished_iso,
+        )
+        await bot.send_message(
+            chat_id=group_id,
+            text=ranking_block(participants, finished_iso=finished_iso),
+            parse_mode="HTML",
+        )
+        await bot.send_message(
+            chat_id=group_id,
+            text=kaizen_block(m),
+            parse_mode="HTML",
+        )
+    else:
+        await bot.send_message(
+            chat_id=group_id,
+            text=report_full,
             parse_mode="HTML",
         )
 

@@ -1,10 +1,11 @@
-"""Telegram HTML — premium ko'rinish, lotin matn."""
+"""Telegram HTML — premium + Kaizen."""
 
 from __future__ import annotations
 
 import html as html_lib
 from typing import Any
 
+from kaizen import KaizenMetrics, avg_minutes, compute_kaizen
 from texts import BRAND, INL_DAVOM, INL_QATNASH, INL_TANAFFUS
 from time_util import display_now, elapsed_seconds, format_duration, now_iso
 from timer_util import is_paused, pause_seconds_total, work_seconds
@@ -14,34 +15,28 @@ def he(text: object) -> str:
     return html_lib.escape(str(text or ""))
 
 
-def sep(char: str = "-", width: int = 18) -> str:
+def sep(char: str = "─", width: int = 24) -> str:
     return char * width
 
 
-def banner(title: str, *, icon: str = "🚚") -> str:
-    line = sep("=", 22)
-    return f"{line}\n{icon} <b>{he(title)}</b>\n{line}"
+def banner(title: str, *, icon: str = "🚚", width: int = 24) -> str:
+    line = sep("═", width)
+    return f"{line}\n{icon}  <b>{he(title)}</b>\n{line}"
 
 
-def block_quote(text: str) -> str:
-    return f"<blockquote>{text}</blockquote>"
-
-
-def step_progress(step: int, total: int, width: int = 8) -> str:
-    filled = min(width, int(round(width * step / max(total, 1))))
-    return "▰" * filled + "▱" * (width - filled) + f"  <b>{step}/{total}</b>"
+def glow_bar(pct: int, width: int = 14) -> str:
+    pct = max(0, min(100, int(pct)))
+    filled = min(width, int(round(width * pct / 100)))
+    return "▰" * filled + "▱" * (width - filled)
 
 
 def timer_bar(seconds: int, width: int = 12) -> str:
-    cap = 600
-    pct = min(100, int(round(100 * min(seconds, cap) / cap)))
-    filled = min(width, int(round(width * pct / 100)))
-    return "█" * filled + "░" * (width - filled)
+    return glow_bar(min(100, int(round(100 * min(seconds, 600) / 600))), width)
 
 
-def percent_label(seconds: int, cap: int = 600) -> str:
-    pct = min(100, int(round(100 * min(seconds, cap) / cap)))
-    return f"<b>{pct}%</b>"
+def step_progress(step: int, total: int, width: int = 10) -> str:
+    pct = int(round(100 * step / max(total, 1)))
+    return f"{glow_bar(pct, width)}  <b>{step}/{total}</b>"
 
 
 def rank_badge(index: int) -> str:
@@ -51,16 +46,23 @@ def rank_badge(index: int) -> str:
         return "🥈"
     if index == 3:
         return "🥉"
-    return f"<code>{index:02d}</code>"
+    return f"#{index:02d}"
 
 
 def status_chip(status: str) -> str:
     return {
-        "draft": "📝 Tayyorgarlik",
+        "draft": "📝 Tayyor",
         "active": "🟢 LIVE",
         "finishing": "🏁 Yakun",
-        "completed": "✅ Tugadi",
+        "completed": "✅ OK",
     }.get(status, "⚪")
+
+
+def metric_card(icon: str, title: str, value: str, *, bar_pct: int | None = None) -> str:
+    lines = [f"{icon}  <b>{he(title)}</b>", f"    <code>{he(value)}</code>"]
+    if bar_pct is not None:
+        lines.append(f"    <code>{glow_bar(bar_pct, 12)}</code>  <b>{bar_pct}%</b>")
+    return "\n".join(lines)
 
 
 def _team_stats(participants: list[dict[str, Any]]) -> tuple[int, int, int]:
@@ -76,15 +78,13 @@ def _team_stats(participants: list[dict[str, Any]]) -> tuple[int, int, int]:
 def masul_welcome(name: str) -> str:
     return (
         f"{banner(BRAND, icon='✨')}\n\n"
-        f"👋 <b>Xush kelibsiz, {he(name)}</b>\n\n"
-        f"{block_quote('Yuk jarayoni — real vaqt, professional nazorat')}\n\n"
-        "🎯 <b>Tez yo'riqnoma</b>\n"
-        "┏━━━━━━━━━━━━━━━━━━━━┓\n"
-        "┃ 🚚 <b>Yuk keldi</b> — 2 ta surat\n"
-        f"┃ 👷 Guruh — <b>{INL_QATNASH}</b>\n"
-        "┃ ⏸/▶️ Tanaffus — shaxsiy chat\n"
-        "┃ 🏁 <b>Yakunlash</b> — avto-hisobot\n"
-        "┗━━━━━━━━━━━━━━━━━━━━┛\n\n"
+        f"👋  <b>Xush kelibsiz, {he(name)}</b>\n\n"
+        "┏━━━━━━━━━━━━━━━━━━━━━━┓\n"
+        "┃  🚚  Yuk keldi\n"
+        f"┃  👷  {INL_QATNASH}\n"
+        "┃  ⏸   Tanaffus / Davom\n"
+        "┃  🏁  Yakun + Kaizen\n"
+        "┗━━━━━━━━━━━━━━━━━━━━━━┛\n\n"
         f"<i>🕐 {he(display_now())}</i>"
     )
 
@@ -92,21 +92,18 @@ def masul_welcome(name: str) -> str:
 def worker_welcome() -> str:
     return (
         f"{banner('YUK JARAYONI', icon='👷')}\n\n"
-        f"Guruhda <b>{INL_QATNASH}</b> tugmasini bosing.\n\n"
-        f"{block_quote('Shaxsiy taymer · tanaffus · live reyting')}\n\n"
-        "<i>Mas'ul sizni avtomatik ko'radi — zo'r ish!</i>"
+        f"🔽  <b>{INL_QATNASH}</b>\n\n"
+        "<i>⏱ Taymer  ·  ⏸ Tanaffus  ·  🏆 Reyting</i>"
     )
 
 
 def photo_prompt(step: int, total: int, title: str, hint: str) -> str:
-    bar = step_progress(step, total)
     return (
-        f"📸 <b>SURAT YUKLASH</b>\n"
-        f"<code>{bar}</code>\n\n"
+        f"📸  <b>SURAT {step}/{total}</b>\n"
+        f"<code>{step_progress(step, total)}</code>\n\n"
         f"<b>{he(title)}</b>\n"
         f"<i>{he(hint)}</i>\n\n"
-        f"{sep('-')}\n"
-        "⬇️ <b>Shu yerga foto yuboring</b>"
+        "⬇️  <b>Fotoni yuboring</b>"
     )
 
 
@@ -124,51 +121,63 @@ def group_load_card(
     if phase == "finishing":
         head_icon, head_title = "🏁", "YUK YAKUNLANMOQDA"
     else:
-        head_icon, head_title = "🚚", "YUK KELDI — LIVE"
+        head_icon, head_title = "🚚", "YUK KELDI  ·  LIVE"
 
     active_n, paused_n, avg_sec = _team_stats(participants)
+    cycle = elapsed_seconds(started) if started else 0
 
     lines = [
         banner(head_title, icon=head_icon),
         "",
-        f"🪪 <b>Sessiya</b>  <code>#{sid}</code>",
-        f"👤 <b>Mas'ul</b>  {he(masul)}",
-        f"📡 <b>Holat</b>  {status_chip(status)}",
+        f"🪪  Sessiya   <code>#{sid}</code>",
+        f"👤  Mas'ul   <b>{he(masul)}</b>",
+        f"📡  Holat    {status_chip(status)}",
         "",
     ]
 
     if participants:
         sorted_p = sorted(participants, key=lambda p: work_seconds(p), reverse=True)
-        lines.append(f"👷 <b>JAMOA</b>  ·  {len(participants)} kishi")
+        lines.append(f"👷  <b>JAMOA</b>   {len(participants)} kishi")
         if phase == "active":
             lines.append(
-                f"<i>🟢 {active_n} ishlayapti  ·  ⏸ {paused_n} tanaffus  ·  "
-                f"o'rtacha {format_duration(avg_sec)}</i>"
+                f"<i>🟢 {active_n} faol  ·  ⏸ {paused_n} pauza  ·  "
+                f"⌀ {format_duration(avg_sec)}</i>"
             )
         lines.append("")
-        lines.append("<code>+----------------------+</code>")
+        lines.append("<code>╭────────────────────────╮</code>")
         for i, p in enumerate(sorted_p, 1):
             sec = work_seconds(p)
-            bar = timer_bar(sec, width=10)
-            pct = percent_label(sec)
-            uname = p.get("username") or ""
-            at = f" @{he(uname)}" if uname else ""
-            pulse = "⏸ <b>TANAFFUS</b>" if is_paused(p) else "🔥 <b>FAOL</b>"
+            if is_paused(p):
+                pulse, st = "⏸", "PAUZA"
+            else:
+                pulse, st = "🔥", "FAOL"
             lines.append(
-                f"<code>|</code> {rank_badge(i)} <b>{he(p.get('user_name'))}</b>{at}\n"
-                f"<code>|</code>    {pulse}  ⏱ <b>{format_duration(sec)}</b> {pct}\n"
-                f"<code>|</code>    <code>{bar}</code>"
+                f"<code>│</code> {rank_badge(i)}  <b>{he(p.get('user_name'))}</b>  "
+                f"<i>{st}</i>\n"
+                f"<code>│</code>     {pulse}  ⏱  <b>{format_duration(sec)}</b>\n"
+                f"<code>│</code>     <code>{timer_bar(sec, 11)}</code>"
             )
-        lines.append("<code>+----------------------+</code>")
+        lines.append("<code>╰────────────────────────╯</code>")
     else:
-        lines.append(
-            block_quote("Hozircha hech kim yo'q — birinchi bo'lib qatnashing!")
+        lines.extend(
+            [
+                sep("·"),
+                "⚡  <b>Hozircha jamoa yo'q</b>",
+                f"🔽  Birinchi bo'ling — <b>{INL_QATNASH}</b>",
+                sep("·"),
+            ]
         )
 
     if started and phase == "active":
-        lines.extend(["", f"⏳ <b>Yuk vaqti:</b> {format_duration(elapsed_seconds(started))}"])
+        lines.extend(
+            [
+                "",
+                f"⏳  <b>Yuk vaqti</b>  {format_duration(cycle)}",
+                f"<code>{glow_bar(min(100, cycle // 6), 16)}</code>",
+            ]
+        )
 
-    lines.extend(["", sep("-"), f"<i>🕐 {he(display_now())} · {he(BRAND)}</i>"])
+    lines.extend(["", sep(), f"<i>🕐 {he(display_now())}  ·  {he(BRAND)}</i>"])
     return "\n".join(lines)
 
 
@@ -179,35 +188,76 @@ def personal_timer_card(
 ) -> str:
     name = participant.get("user_name") or ""
     sec = work_seconds(participant)
-    bar = timer_bar(sec, width=14)
-    pct = percent_label(sec)
     paused = is_paused(participant)
     pause_sum = pause_seconds_total(participant)
     sid = session["id"]
 
     if paused:
-        mood = banner("TANAFFUS", icon="⏸")
-        hint = f"Tayyor bo'lsangiz — <b>{INL_DAVOM}</b>"
-        status_line = "💤 <i>Taymer to'xtatilgan</i>"
+        head = banner("TANAFFUS", icon="⏸")
+        hint = f"▶️  {INL_DAVOM}"
+        sub = "💤  Taymer to'xtatilgan"
     else:
-        mood = banner("ISH VAQTINGIZ", icon="🔥")
-        hint = f"Boshqa ishga ketdingizmi? — <b>{INL_TANAFFUS}</b>"
-        status_line = "⚡ <i>Vaqt ketyapti — zo'r ish!</i>"
+        head = banner("ISH VAQTI", icon="🔥")
+        hint = f"⏸  {INL_TANAFFUS}"
+        sub = "⚡  Zo'r tempo!"
 
-    extra = ""
-    if pause_sum > 0:
-        extra = f"\n☕ <b>Tanaffus jami:</b> {format_duration(pause_sum)}"
+    extra = f"\n☕  Tanaffus: <b>{format_duration(pause_sum)}</b>" if pause_sum else ""
 
     return (
-        f"{mood}\n\n"
-        f"🪪 Yuk <code>#{sid}</code>  ·  👤 <b>{he(name)}</b>\n"
-        f"{status_line}\n\n"
-        f"⏱ <b>ISH VAQTI</b>\n"
-        f"<code>{bar}</code>  {pct}\n"
-        f"<b>🎯 {format_duration(sec)}</b>{extra}\n\n"
-        f"{block_quote(hint)}\n\n"
+        f"{head}\n\n"
+        f"🪪  #{sid}  ·  👤  <b>{he(name)}</b>\n"
+        f"<i>{sub}</i>\n\n"
+        f"⏱  <b>{format_duration(sec)}</b>\n"
+        f"<code>{timer_bar(sec, 16)}</code>{extra}\n\n"
+        f"<i>{hint}</i>\n\n"
         f"<i>🕐 {he(display_now())}</i>"
     )
+
+
+def kaizen_block(m: KaizenMetrics) -> str:
+    return (
+        f"{banner('KAIZEN  ·  YAKUNIY TAHLIL', icon='📊', width=26)}\n\n"
+        f"{metric_card('⏱', 'Jami tushirish vaqti', format_duration(m.cycle_sec), bar_pct=min(100, m.utilization_pct))}\n\n"
+        f"{metric_card('👤', 'Bir xodim o\'rtacha', avg_minutes(m.avg_work_sec))}\n\n"
+        f"{metric_card('👷', 'Jamoa jami ish vaqti', format_duration(m.total_work_sec))}\n\n"
+        f"{metric_card('☕', 'Tanaffus (muda)', format_duration(m.total_pause_sec), bar_pct=m.pause_share_pct)}\n\n"
+        "┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n"
+        "<b>📐 Kaizen ko'rsatkichlari</b>\n\n"
+        f"⚙️  <b>Parallel samaradorlik</b>\n    <code>{glow_bar(m.parallel_pct)}</code>  <b>{m.parallel_pct}%</b>\n\n"
+        f"📉  <b>Muda ulushi</b> (tanaffus)\n    <code>{glow_bar(m.pause_share_pct)}</code>  <b>{m.pause_share_pct}%</b>\n\n"
+        f"🚀  <b>Vaqt samaradorligi</b>\n    <code>{glow_bar(m.utilization_pct)}</code>  <b>{m.utilization_pct}%</b>\n\n"
+        f"🏅  <b>Eng tez:</b> {he(m.fastest_name)} — {format_duration(m.fastest_sec)}\n"
+        f"🐢  <b>Eng sekin:</b> {he(m.slowest_name)} — {format_duration(m.slowest_sec)}\n\n"
+        f"{sep('═', 26)}\n"
+        f"{m.grade_icon}  <b>KAIZEN BALLI: {m.kaizen_score}/100</b>  ·  <b>{he(m.grade)}</b>\n"
+        f"{sep('═', 26)}"
+    )
+
+
+def ranking_block(
+    participants: list[dict[str, Any]], *, finished_iso: str
+) -> str:
+    lines = [
+        "🏆  <b>REYTING</b>",
+        "<code>╭────────────────────────╮</code>",
+    ]
+    if not participants:
+        lines.append("<code>│</code>  <i>Ishtirokchi yo'q</i>")
+    else:
+        ranked = sorted(
+            participants,
+            key=lambda p: work_seconds(p, until_iso=finished_iso),
+            reverse=True,
+        )
+        for i, p in enumerate(ranked, 1):
+            sec = work_seconds(p, until_iso=finished_iso)
+            lines.append(
+                f"<code>│</code> {rank_badge(i)}  <b>{he(p.get('user_name'))}</b>\n"
+                f"<code>│</code>      ⏱  {format_duration(sec)}  "
+                f"<code>{timer_bar(sec, 8)}</code>"
+            )
+    lines.append("<code>╰────────────────────────╯</code>")
+    return "\n".join(lines)
 
 
 def final_report(
@@ -215,75 +265,42 @@ def final_report(
     session: dict[str, Any],
     participants: list[dict[str, Any]],
 ) -> str:
-    started = session.get("started_at") or ""
     finished = session.get("finished_at") or now_iso()
-    total_sec = elapsed_seconds(started) if started else 0
-    if finished and started:
-        from time_util import parse_iso
+    m = compute_kaizen(session=session, participants=participants, finished_iso=finished)
 
-        s, f = parse_iso(started), parse_iso(finished)
-        if s and f:
-            total_sec = max(total_sec, int((f - s).total_seconds()))
-
-    lines = [
-        banner("YUK JARAYONI — HISOBOT", icon="📋"),
-        "",
-        f"🪪 <b>№</b> <code>#{session['id']}</code>",
-        f"👤 <b>Mas'ul</b> {he(session.get('masul_name'))}",
-        f"🗓 <b>Sana</b> {he(display_now())}",
-        f"⏱ <b>Jami</b> {format_duration(total_sec)}",
-        f"👷 <b>Jamoa</b> {len(participants)} kishi",
-        "",
-        "🏆 <b>REYTING — ish vaqti</b>",
-        "<code>+------------------------+</code>",
-    ]
-
-    if participants:
-        ranked = sorted(
-            participants,
-            key=lambda p: work_seconds(p, until_iso=finished),
-            reverse=True,
-        )
-        for i, p in enumerate(ranked, 1):
-            sec = work_seconds(p, until_iso=finished)
-            pause_sec = pause_seconds_total(p, until_iso=finished)
-            bar = timer_bar(sec, width=8)
-            note = f" · tanaffus {format_duration(pause_sec)}" if pause_sec else ""
-            lines.append(
-                f"<code>|</code> {rank_badge(i)} <b>{he(p.get('user_name'))}</b>\n"
-                f"<code>|</code>    ⏱ <b>{format_duration(sec)}</b>{he(note)}\n"
-                f"<code>|</code>    <code>{bar}</code>"
-            )
-    else:
-        lines.append("<code>|</code> <i>Qatnashuvchi yo'q</i>")
-
-    lines.extend(
-        [
-            "<code>+------------------------+</code>",
-            "",
-            "📸 <b>Galereya</b>",
-            "   🚛 Mashina  →  ➕ Qo'shimcha  →  🏁 Yakun",
-            "",
-            sep("=", 22),
-            "✨ <b>YUK MUVAFFAQIYATLI TUGADI</b> ✨",
-            sep("=", 22),
-        ]
+    return (
+        f"{banner('HISOBOT', icon='📋')}\n\n"
+        f"🪪  <code>#{session['id']}</code>  ·  👤  <b>{he(session.get('masul_name'))}</b>\n"
+        f"🗓  {he(display_now())}  ·  👷  {m.headcount} kishi\n\n"
+        f"{ranking_block(participants, finished_iso=finished)}\n\n"
+        f"{kaizen_block(m)}\n\n"
+        "📸  🚛 Mashina  →  ➕ Qo'shimcha  →  🏁 Yakun\n\n"
+        f"✨  <b>YUK MUVAFFAQIYATLI TUGADI</b>  ✨"
     )
-    return "\n".join(lines)
+
+
+def report_caption_short(session: dict[str, Any], participants: list) -> str:
+    finished = session.get("finished_at") or now_iso()
+    m = compute_kaizen(
+        session=session, participants=participants, finished_iso=finished
+    )
+    return (
+        f"📋  <b>HISOBOT #{session['id']}</b>\n\n"
+        f"⏱  Jami: <b>{format_duration(m.cycle_sec)}</b>\n"
+        f"👤  O'rtacha: <b>{avg_minutes(m.avg_work_sec)}</b>\n"
+        f"{m.grade_icon}  Kaizen: <b>{m.kaizen_score}/100</b>\n\n"
+        "<i>Batafsil — keyingi xabar</i>"
+    )
 
 
 def operators_list_text(operators: list[dict[str, Any]]) -> str:
-    lines = [
-        banner("MAS'ULLAR", icon="👥"),
-        "<i>Yuk ochish / yakunlash · Railway shart emas</i>",
-        "",
-    ]
+    lines = [banner("MAS'ULLAR", icon="👥"), ""]
     if not operators:
-        lines.append(block_quote("Mas'ul qo'shish — birinchi qadam"))
+        lines.append("<i>➕ Mas'ul qo'shish</i>")
     else:
         for i, op in enumerate(operators, 1):
             lines.append(
-                f"{rank_badge(i)} <b>{he(op.get('user_name'))}</b>\n"
+                f"{rank_badge(i)}  <b>{he(op.get('user_name'))}</b>\n"
                 f"    <code>{op.get('user_id')}</code>"
             )
     lines.append(f"\n<i>🕐 {he(display_now())}</i>")
@@ -294,47 +311,37 @@ def masul_status_panel(session: dict[str, Any] | None, participants: list) -> st
     if not session:
         return (
             f"{banner('HOLAT', icon='📊')}\n\n"
-            f"{block_quote('Hozircha faol yuk yo\'q')}\n\n"
-            "🚚 <b>Yuk keldi</b> — boshlash uchun bosing"
+            "<i>Faol yuk yo'q</i>\n\n"
+            "🚚  <b>Yuk keldi</b> ni bosing"
         )
     return group_load_card(session=session, participants=participants, phase="active")
 
 
 def publish_success(session_id: int) -> str:
     return (
-        f"✨ <b>Tayyor!</b> Yuk guruhga chiqdi\n\n"
-        f"🪪 <code>#{session_id}</code> · {he(BRAND)}\n\n"
-        f"👷 Jamoa <b>{INL_QATNASH}</b> ni bosadi\n"
-        "🏁 Tayyor bo'lgach — <b>Yakunlash</b>"
+        f"✨  <b>LIVE!</b>  Yuk #{session_id}\n\n"
+        f"👷  {INL_QATNASH}\n"
+        "🏁  Keyin <b>Yakunlash</b>"
     )
 
 
 def finish_success() -> str:
     return (
-        f"{banner('TAYYOR!', icon='🎉')}\n\n"
-        f"{block_quote('Hisobot guruhga yuborildi')}\n\n"
-        "Keyingi yuk → <b>Yuk keldi</b>"
+        f"{banner('TAYYOR', icon='🎉')}\n\n"
+        "📊  <b>Kaizen hisobot</b> guruhga yuborildi"
     )
 
 
 def media_caption_start(kind: str, session_id: int) -> str:
     labels = {
-        "car": ("🚛", "MASHINA", "boshlanish"),
-        "extra": ("➕", "QO'SHIMCHA", "boshlanish"),
+        "car": ("🚛", "MASHINA"),
+        "extra": ("➕", "QO'SHIMCHA"),
     }
-    icon, title, phase = labels.get(kind, ("📷", "SURAT", ""))
-    return (
-        f"{icon} <b>{title}</b>\n"
-        f"<i>{he(phase)}</i>\n"
-        f"{sep('-')}\n"
-        f"🪪 #{session_id} · <b>LIVE</b>"
-    )
+    icon, title = labels.get(kind, ("📷", "SURAT"))
+    return f"{icon}  <b>{title}</b>  ·  boshlanish\n🪪  #{session_id}  ·  <b>LIVE</b>"
 
 
 def media_caption_end(kind: str) -> str:
-    labels = {
-        "car": ("🚛", "MASHINA", "yakun"),
-        "extra": ("➕", "QO'SHIMCHA", "yakun"),
-    }
-    icon, title, phase = labels.get(kind, ("📷", "SURAT", ""))
-    return f"{icon} <b>{title}</b> · <i>{he(phase)}</i>"
+    labels = {"car": ("🚛", "MASHINA"), "extra": ("➕", "QO'SHIMCHA")}
+    icon, title = labels.get(kind, ("📷", "SURAT"))
+    return f"{icon}  <b>{title}</b>  ·  yakun"
