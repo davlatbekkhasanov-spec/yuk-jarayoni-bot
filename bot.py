@@ -4,12 +4,14 @@ from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 import asyncio
 import os
 
+# TOKEN Railway Variables дан олинади
 TOKEN = os.getenv("BOT_TOKEN")
 
 bot = Bot(token=TOKEN)
 dp = Dispatcher()
 
 
+# START LOAD
 @dp.message(Command("startload"))
 async def start_load(message: types.Message):
 
@@ -31,6 +33,7 @@ async def start_load(message: types.Message):
     )
 
 
+# JOIN BUTTON
 @dp.callback_query()
 async def join_handler(callback: types.CallbackQuery):
 
@@ -43,7 +46,18 @@ async def join_handler(callback: types.CallbackQuery):
     await callback.answer()
 
 
+# GROUP ID
+@dp.message(Command("id"))
+async def get_group_id(message: types.Message):
+
+    await message.answer(
+        f"📌 Group ID:\n{message.chat.id}"
+    )
+
+
+# MAIN
 async def main():
+    print("Bot ishga tushdi...")
     await dp.start_polling(bot)
 
 
