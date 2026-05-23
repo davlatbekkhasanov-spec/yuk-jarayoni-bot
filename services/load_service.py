@@ -33,16 +33,6 @@ from ui import (
 log = logging.getLogger(__name__)
 
 
-def _album_msg_ids(session: dict[str, Any]) -> list[int]:
-    raw = session.get("group_album_msg_ids")
-    if raw:
-        return [int(x) for x in str(raw).split(",") if x.strip().isdigit()]
-    first = session.get("group_album_msg_id")
-    if first:
-        return [int(first)]
-    return []
-
-
 def _build_start_album(session: dict[str, Any], session_id: int) -> list[InputMediaPhoto]:
     media: list[InputMediaPhoto] = []
     if session.get("car_photo_start"):
@@ -64,34 +54,26 @@ def _build_start_album(session: dict[str, Any], session_id: int) -> list[InputMe
     return media
 
 
-def _build_finish_album(session: dict[str, Any], session_id: int) -> list[InputMediaPhoto]:
-    """4 ta surat: mashina + qo'shimcha (boshlanish va yakun)."""
-    items: list[tuple[str, str, str]] = [
-        ("car_photo_start", "car", "start"),
-        ("unload_photo_start", "extra", "start"),
-        ("car_photo_end", "car", "end"),
-        ("unload_photo_end", "extra", "end"),
-    ]
+def _build_end_album(session: dict[str, Any]) -> list[InputMediaPhoto]:
+    """Yakun: faqat oxirgi 2 ta surat (boshidagi suratlar saqlanadi)."""
     media: list[InputMediaPhoto] = []
-    for field, kind, phase in items:
-        file_id = session.get(field)
-        if not file_id:
-            continue
-        cap = (
-            media_caption_start(kind, session_id)
-            if phase == "start"
-            else media_caption_end(kind)
+    if session.get("car_photo_end"):
+        media.append(
+            InputMediaPhoto(
+                media=session["car_photo_end"],
+                caption=media_caption_end("car"),
+                parse_mode="HTML",
+            )
         )
-        media.append(InputMediaPhoto(media=file_id, caption=cap, parse_mode="HTML"))
+    if session.get("unload_photo_end"):
+        media.append(
+            InputMediaPhoto(
+                media=session["unload_photo_end"],
+                caption=media_caption_end("extra"),
+                parse_mode="HTML",
+            )
+        )
     return media
-
-
-async def _delete_album_messages(bot: Bot, chat_id: int, session: dict[str, Any]) -> None:
-    for mid in _album_msg_ids(session):
-        try:
-            await bot.delete_message(chat_id=chat_id, message_id=mid)
-        except Exception as e:
-            log.debug("delete album msg %s: %s", mid, e)
 
 
 async def publish_load_to_group(bot: Bot, session_id: int) -> None:
@@ -203,38 +185,48 @@ async def publish_final_report(bot: Bot, session_id: int) -> None:
         session=session, participants=participants, finished_iso=finished_iso
     )
 
-    await _delete_album_messages(bot, group_id, session)
-
-    album = _build_finish_album(session, session_id)
+    reply_to = session.get("group_status_msg_id")
     caption = report_caption_short(session, participants)[:1020]
 
-    if album:
-        album[0].caption = caption
-        album[0].parse_mode = "HTML"
-        for i in range(1, len(album)):
-            album[i].caption = None
-        sent = await bot.send_media_group(chat_id=group_id, media=album[:10])
-        album_ids = ",".join(str(msg.message_id) for msg in sent)
-        update_session(
-            session_id,
-            group_album_msg_id=sent[0].message_id if sent else None,
-            group_album_msg_ids=album_ids,
+    end_album = _build_end_album(session)
+    if end_album:
+        end_album[0].caption = caption
+        end_album[0].parse_mode = "HTML"
+        if len(end_album) > 1:
+            end_album[1].caption = None
+        await bot.send_media_group(
+            chat_id=group_id,
+            media=end_album[:10],
+            reply_to_message_id=reply_to,
+        )
+    elif reply_to:
+        await bot.send_message(
+            chat_id=group_id,
+            text=caption,
+            parse_mode="HTML",
+            reply_to_message_id=reply_to,
         )
     else:
         await bot.send_message(chat_id=group_id, text=caption, parse_mode="HTML")
 
+    await refresh_group_status(bot, session_id, phase="completed")
+
+    rank_kw: dict[str, Any] = {"parse_mode": "HTML"}
+    kaizen_kw: dict[str, Any] = {"parse_mode": "HTML"}
+    if reply_to:
+        rank_kw["reply_to_message_id"] = reply_to
+        kaizen_kw["reply_to_message_id"] = reply_to
+
     await bot.send_message(
         chat_id=group_id,
         text=ranking_block(participants, finished_iso=finished_iso),
-        parse_mode="HTML",
+        **rank_kw,
     )
     await bot.send_message(
         chat_id=group_id,
         text=kaizen_block(m),
-        parse_mode="HTML",
+        **kaizen_kw,
     )
-
-    await refresh_group_status(bot, session_id, phase="completed")
 
 
 def active_session_for_user(user_id: int) -> dict[str, Any] | None:
