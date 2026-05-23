@@ -59,6 +59,7 @@ async def _send_with_reply_chain(
     **send_kw: Any,
 ) -> Message:
     """Bir nechta xabarga reply urinish; oxirida replysiz."""
+    send_kw.setdefault("chat_id", chat_id)
     for target in reply_targets:
         if not target:
             continue
@@ -141,7 +142,6 @@ async def _send_end_album_threaded(
         chat_id=chat_id,
         reply_targets=targets,
         send_fn=bot.send_message,
-        chat_id=chat_id,
         text=f"🏁  <b>Yakun suratlari</b>  ·  #{session_id}",
         parse_mode="HTML",
     )
@@ -184,7 +184,6 @@ async def publish_load_to_group(bot: Bot, session_id: int) -> None:
             chat_id=group_id,
             reply_targets=[first_id],
             send_fn=bot.send_message,
-            chat_id=group_id,
             text=status_text,
             parse_mode="HTML",
             reply_markup=group_join_keyboard(session_id),
@@ -307,7 +306,6 @@ async def publish_final_report(bot: Bot, session_id: int) -> None:
         chat_id=group_id,
         reply_targets=[status_id, album_id],
         send_fn=bot.send_message,
-        chat_id=group_id,
         text=report_text,
         parse_mode="HTML",
     )
