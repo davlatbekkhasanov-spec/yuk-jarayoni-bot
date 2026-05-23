@@ -12,7 +12,7 @@ from services.group_check import GroupConfigError, group_fix_message, parse_grou
 from db import get_active_session
 from keyboards import masul_main_menu
 from roles import can_manage_yuk
-from ui import masul_welcome
+from ui import masul_welcome, worker_welcome, worker_welcome
 
 router = Router()
 
@@ -41,13 +41,7 @@ async def cmd_start(message: Message, state: FSMContext) -> None:
         )
         return
 
-    await message.answer(
-        "👋 <b>Юк жараёни боти</b>\n\n"
-        "Гуруҳда <b>✅ Қатнашиш</b> — ish vaqti va tanaffus.\n\n"
-        "<i>Юк ochish/yakunlash: admin sizni «масъул» qiladi — "
-        "ID yuborish shart emas, Railway ham emas.</i>",
-        parse_mode="HTML",
-    )
+    await message.answer(worker_welcome(), parse_mode="HTML")
 
 
 @router.message(Command("id"))

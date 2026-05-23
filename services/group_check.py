@@ -51,10 +51,13 @@ def parse_group_id_hint() -> str:
 
 
 def group_fix_message(*, detail: str = "") -> str:
+    from ui import banner, block_quote
+
     hint = parse_group_id_hint()
     extra = f"\n\n<i>{detail}</i>" if detail else ""
     return (
-        "❌ <b>Guruhga yuborib bo‘lmadi</b>\n\n"
+        f"{banner('ULANISH XATOSI', icon='⚠️')}\n\n"
+        block_quote("Guruhga yuborib bo‘lmadi") + "\n\n"
         "<b>Telegram «chat not found» degani:</b>\n"
         "• <code>GROUP_ID</code> noto‘g‘ri (shaxsiy ID emas!)\n"
         "• Bot guruhda yo‘q\n"

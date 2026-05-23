@@ -26,7 +26,7 @@ def _menu(uid: int):
     )
 
 
-@router.message(F.text == "👥 Масъуллар", F.chat.type == "private")
+@router.message(F.text.in_({"👥 Масъуллар", "👥  Масъуллар"}), F.chat.type == "private")
 async def list_ops(message: Message) -> None:
     if not is_admin(message.from_user.id):
         await message.answer("⚠️ Faqat asosiy admin uchun.", parse_mode="HTML")
@@ -39,7 +39,7 @@ async def list_ops(message: Message) -> None:
     )
 
 
-@router.message(F.text == "➕ Масъул қўшиш", F.chat.type == "private")
+@router.message(F.text.in_({"➕ Масъул қўшиш", "➕  Масъул қўшиш"}), F.chat.type == "private")
 async def add_op_start(message: Message, state: FSMContext) -> None:
     if not is_admin(message.from_user.id):
         await message.answer("⚠️ Faqat asosiy admin uchun.", parse_mode="HTML")

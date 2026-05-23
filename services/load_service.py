@@ -19,7 +19,13 @@ from db import (
 )
 from keyboards import group_join_closed, group_join_keyboard, personal_timer_keyboard
 from time_util import now_iso
-from ui import final_report, group_load_card, personal_timer_card
+from ui import (
+    final_report,
+    group_load_card,
+    media_caption_end,
+    media_caption_start,
+    personal_timer_card,
+)
 
 log = logging.getLogger(__name__)
 
@@ -36,12 +42,12 @@ async def publish_load_to_group(bot: Bot, session_id: int) -> None:
     media = [
         InputMediaPhoto(
             media=session["car_photo_start"],
-            caption="🚛 <b>Машина</b> — бошланиш",
+            caption=media_caption_start("car", session_id),
             parse_mode="HTML",
         ),
         InputMediaPhoto(
             media=session["unload_photo_start"],
-            caption="➕ <b>Қўшимча расм</b> — бошланиш",
+            caption=media_caption_start("extra", session_id),
             parse_mode="HTML",
         ),
     ]
@@ -140,21 +146,32 @@ async def publish_final_report(bot: Bot, session_id: int) -> None:
         media.append(
             InputMediaPhoto(
                 media=session["car_photo_start"],
-                caption="🚛 Бошланиш — машина",
+                caption=media_caption_start("car", session_id),
+                parse_mode="HTML",
             )
         )
     if session.get("unload_photo_start"):
         media.append(
             InputMediaPhoto(
-                media=session["unload_photo_start"], caption="➕ Бошланиш — қўшимча"
+                media=session["unload_photo_start"],
+                caption=media_caption_start("extra", session_id),
+                parse_mode="HTML",
             )
         )
     if session.get("car_photo_end"):
-        media.append(InputMediaPhoto(media=session["car_photo_end"], caption="🚛 Якун — машина"))
+        media.append(
+            InputMediaPhoto(
+                media=session["car_photo_end"],
+                caption=media_caption_end("car"),
+                parse_mode="HTML",
+            )
+        )
     if session.get("unload_photo_end"):
         media.append(
             InputMediaPhoto(
-                media=session["unload_photo_end"], caption="➕ Якун — қўшимча"
+                media=session["unload_photo_end"],
+                caption=media_caption_end("extra"),
+                parse_mode="HTML",
             )
         )
 

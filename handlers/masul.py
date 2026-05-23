@@ -24,7 +24,7 @@ from services.group_check import GroupConfigError, group_fix_message, verify_gro
 from services.load_service import publish_final_report, publish_load_to_group, refresh_group_status
 from states import LoadFinishStates, LoadStartStates
 from time_util import now_iso
-from ui import masul_status_panel, photo_prompt
+from ui import finish_success, masul_status_panel, photo_prompt, publish_success
 
 router = Router()
 log = logging.getLogger(__name__)
@@ -54,7 +54,7 @@ async def _require_operator(message: Message) -> bool:
     return True
 
 
-@router.message(F.text == "🚚 Юк келди", F.chat.type == "private")
+@router.message(F.text.in_({"🚚 Юк келди", "🚚  Юк келди"}), F.chat.type == "private")
 async def start_load_flow(message: Message, state: FSMContext) -> None:
     if not await _require_operator(message):
         return
@@ -154,15 +154,13 @@ async def start_extra_photo(message: Message, state: FSMContext, bot: Bot) -> No
     await state.clear()
     uid = message.from_user.id
     await message.answer(
-        "✅ <b>Юк гуруҳga e’lon qilindi!</b>\n\n"
-        "👷 Ishchilar <b>Қатнашиш</b> bosadi.\n"
-        "Tayyor bo‘lgach <b>🏁 Якунлаш</b> ni bosing.",
+        publish_success(sid),
         parse_mode="HTML",
         reply_markup=_menu(uid, can_finish=True),
     )
 
 
-@router.message(F.text == "📊 Ҳолат", F.chat.type == "private")
+@router.message(F.text.in_({"📊 Ҳолат", "📊  Ҳолат"}), F.chat.type == "private")
 async def status_panel(message: Message) -> None:
     if not await _require_operator(message):
         return
@@ -179,7 +177,7 @@ async def status_panel(message: Message) -> None:
     )
 
 
-@router.message(F.text == "🏁 Якунлаш", F.chat.type == "private")
+@router.message(F.text.in_({"🏁 Якунлаш", "🏁  Якунлаш"}), F.chat.type == "private")
 async def finish_prompt(message: Message) -> None:
     if not await _require_operator(message):
         return
@@ -269,7 +267,7 @@ async def finish_extra_photo(message: Message, state: FSMContext, bot: Bot) -> N
     await state.clear()
 
     await message.answer(
-        "✅ <b>Отчёт guruhga yuborildi!</b>\n\nYangi yuk uchun <b>🚚 Юк келди</b> bosing.",
+        finish_success(),
         parse_mode="HTML",
         reply_markup=_menu(message.from_user.id, can_finish=False),
     )
