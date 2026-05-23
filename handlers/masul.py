@@ -261,9 +261,10 @@ async def finish_extra_photo(message: Message, state: FSMContext, bot: Bot) -> N
         return
     data = await state.get_data()
     sid = int(data.get("session_id"))
+    unload_id = message.photo[-1].file_id
     update_session(
         sid,
-        unload_photo_end=message.photo[-1].file_id,
+        unload_photo_end=unload_id,
         status="completed",
         finished_at=now_iso(),
     )

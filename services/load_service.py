@@ -94,49 +94,92 @@ def _build_start_album(session: dict[str, Any], session_id: int) -> list[InputMe
     return media
 
 
-def _build_end_album(session: dict[str, Any]) -> list[InputMediaPhoto]:
+def _build_session_photo_album(
+    session: dict[str, Any], session_id: int
+) -> list[InputMediaPhoto]:
+    """4 ta surat: boshlanish + yakun (bitta albom)."""
+    specs: list[tuple[str, str]] = [
+        ("car_photo_start", media_caption_start("car", session_id)),
+        ("unload_photo_start", media_caption_start("extra", session_id)),
+        ("car_photo_end", media_caption_end("car")),
+        ("unload_photo_end", media_caption_end("extra")),
+    ]
     media: list[InputMediaPhoto] = []
-    if session.get("car_photo_end"):
+    for field, caption in specs:
+        file_id = session.get(field)
+        if not file_id:
+            continue
         media.append(
-            InputMediaPhoto(
-                media=session["car_photo_end"],
-                caption=media_caption_end("car"),
-                parse_mode="HTML",
-            )
+            InputMediaPhoto(media=file_id, caption=caption, parse_mode="HTML")
         )
-    if session.get("unload_photo_end"):
-        media.append(
-            InputMediaPhoto(
-                media=session["unload_photo_end"],
-                caption=media_caption_end("extra"),
-                parse_mode="HTML",
-            )
+    if media:
+        media[0] = InputMediaPhoto(
+            media=media[0].media,
+            caption=f"📸  <b>YUK #{session_id}</b>  ·  boshlanish + yakun",
+            parse_mode="HTML",
         )
+        for i in range(1, len(media)):
+            media[i] = InputMediaPhoto(media=media[i].media, parse_mode="HTML")
     return media
 
 
-async def _send_end_album(
+async def _send_session_photos(
     bot: Bot,
     *,
     chat_id: int,
     session: dict[str, Any],
     session_id: int,
-) -> None:
-    """Yakun 2 surat — albom, statusdan keyin to'g'ridan-to'g'ri (ko'rinadi)."""
-    end_album = _build_end_album(session)
-    if not end_album:
-        log.warning("session %s: yakun suratlari yo'q", session_id)
-        return
-
-    end_album[0].caption = f"🏁  <b>YAKUN</b>  ·  #{session_id}"
-    end_album[0].parse_mode = "HTML"
-    if len(end_album) > 1:
-        end_album[1].caption = None
+) -> bool:
+    """Guruhga barcha suratlar albomi; muvaffaqiyatsiz bo'lsa alohida yuborish."""
+    album = _build_session_photo_album(session, session_id)
+    if len(album) < 2:
+        log.error(
+            "session %s: suratlar yetarli emas (car_end=%s unload_end=%s)",
+            session_id,
+            bool(session.get("car_photo_end")),
+            bool(session.get("unload_photo_end")),
+        )
+        singles = [
+            session.get("car_photo_end"),
+            session.get("unload_photo_end"),
+        ]
+        sent = False
+        for fid in singles:
+            if not fid:
+                continue
+            try:
+                await bot.send_photo(
+                    chat_id=chat_id,
+                    photo=fid,
+                    caption=f"🏁  <b>YAKUN</b>  ·  #{session_id}",
+                    parse_mode="HTML",
+                )
+                sent = True
+            except Exception as e:
+                log.error("yakun send_photo %s: %s", session_id, e)
+        if not sent:
+            await bot.send_message(
+                chat_id=chat_id,
+                text=f"⚠️  <b>#{session_id}</b> — yakun suratlari yuborilmadi.",
+                parse_mode="HTML",
+            )
+        return sent
 
     try:
-        await bot.send_media_group(chat_id=chat_id, media=end_album[:10])
+        await bot.send_media_group(chat_id=chat_id, media=album[:10])
+        return True
     except Exception as e:
-        log.error("yakun albom yuborilmadi session %s: %s", session_id, e)
+        log.error("suratlar albomi %s: %s", session_id, e)
+        for item in album:
+            try:
+                await bot.send_photo(
+                    chat_id=chat_id,
+                    photo=item.media,
+                    parse_mode="HTML",
+                )
+            except Exception as e2:
+                log.error("send_photo fallback %s: %s", session_id, e2)
+        return False
 
 
 async def publish_load_to_group(bot: Bot, session_id: int) -> None:
@@ -264,10 +307,11 @@ async def publish_final_report(bot: Bot, session_id: int) -> None:
     participants = list_participants(session_id)
     finished_iso = session.get("finished_at") or now_iso()
 
-    await refresh_group_status(bot, session_id, phase="completed")
     session = get_session(session_id) or session
 
-    await _send_end_album(
+    await refresh_group_status(bot, session_id, phase="completed")
+
+    await _send_session_photos(
         bot, chat_id=group_id, session=session, session_id=session_id
     )
 
