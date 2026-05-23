@@ -1,116 +1,56 @@
-from aiogram import Bot, Dispatcher, types
-from aiogram.filters import Command
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+"""Юк жараёни — Telegram bot."""
+
+from __future__ import annotations
+
 import asyncio
-import os
+import logging
+import sys
 
-TOKEN = os.getenv("BOT_TOKEN")
+from dotenv import load_dotenv
 
-bot = Bot(token=TOKEN)
-dp = Dispatcher()
+load_dotenv()
 
-# ACTIVE LOAD
-active_users = []
+from aiogram import Bot, Dispatcher
+from aiogram.client.default import DefaultBotProperties
+from aiogram.enums import ParseMode
+from aiogram.fsm.storage.memory import MemoryStorage
+
+from config import settings
+from db import init_db
+from handlers import setup_routers
+from handlers.common import ensure_configured
+from services.ticker import TimerTicker
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+)
+log = logging.getLogger(__name__)
 
 
-# START
-@dp.message(Command("start"))
-async def start(message: types.Message):
+async def main() -> None:
+    err = ensure_configured()
+    if err:
+        log.error("%s", err)
+        sys.exit(1)
 
-    await message.answer(
-        "✅ Bot ishlayapti.\n\n"
-        "/id - chat id\n"
-        "/startload - yuk boshlash"
+    init_db()
+    cfg = settings()
+    bot = Bot(
+        token=cfg["token"],
+        default=DefaultBotProperties(parse_mode=ParseMode.HTML),
     )
+    dp = Dispatcher(storage=MemoryStorage())
+    dp.include_router(setup_routers())
 
+    ticker = TimerTicker(bot)
+    await ticker.start()
+    log.info("Bot ishga tushdi (GROUP_ID=%s)", cfg["group_id"])
 
-# GROUP ID
-@dp.message(Command("id"))
-async def get_id(message: types.Message):
-
-    await message.answer(
-        f"📌 Chat ID:\n{message.chat.id}"
-    )
-
-
-# START LOAD
-@dp.message(Command("startload"))
-async def start_load(message: types.Message):
-
-    global active_users
-    active_users = []
-
-    kb = InlineKeyboardMarkup(
-        inline_keyboard=[
-            [
-                InlineKeyboardButton(
-                    text="✅ Қатнашиш",
-                    callback_data="join_load"
-                )
-            ]
-        ]
-    )
-
-    text = (
-        "🚚 ЮК КЕЛДИ\n\n"
-        "📸 Машина фото юборинг\n\n"
-        "👷 Қатнашувчилар:\n"
-        "Ҳозирча йўқ"
-    )
-
-    await message.answer(
-        text,
-        reply_markup=kb
-    )
-
-
-# JOIN
-@dp.callback_query()
-async def join_handler(callback: types.CallbackQuery):
-
-    global active_users
-
-    user = callback.from_user.full_name
-
-    if user not in active_users:
-        active_users.append(user)
-
-    users_text = "\n".join(
-        [f"{i+1}. {name}" for i, name in enumerate(active_users)]
-    )
-
-    kb = InlineKeyboardMarkup(
-        inline_keyboard=[
-            [
-                InlineKeyboardButton(
-                    text="✅ Қатнашиш",
-                    callback_data="join_load"
-                )
-            ]
-        ]
-    )
-
-    text = (
-        "🚚 ЮК КЕЛДИ\n\n"
-        "📸 Машина фото юборинг\n\n"
-        "👷 Қатнашувчилар:\n"
-        f"{users_text}"
-    )
-
-    await callback.message.edit_text(
-        text,
-        reply_markup=kb
-    )
-
-    await callback.answer("Сиз қатнашдингиз ✅")
-
-
-# MAIN
-async def main():
-
-    print("Bot ishga tushdi...")
-
-    await dp.start_polling(bot)
+    try:
+        await dp.start_polling(bot)
+    finally:
+        await ticker.stop()
 
 
 if __name__ == "__main__":
