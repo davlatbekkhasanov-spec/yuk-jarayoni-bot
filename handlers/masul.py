@@ -23,6 +23,11 @@ from roles import can_manage_yuk
 from services.group_check import GroupConfigError, group_fix_message, verify_group_access
 from services.load_service import publish_final_report, publish_load_to_group, refresh_group_status
 from states import LoadFinishStates, LoadStartStates
+from texts import (
+    BTN_HOLAT_ALL,
+    BTN_YAKUNLASH_ALL,
+    BTN_YUK_KELDI_ALL,
+)
 from time_util import now_iso
 from ui import finish_success, masul_status_panel, photo_prompt, publish_success
 
@@ -45,8 +50,8 @@ async def _require_operator(message: Message) -> bool:
         return False
     if not can_manage_yuk(uid):
         await message.answer(
-            "⚠️ Bu bo‘lim faqat <b>mas'ul</b> uchun.\n\n"
-            "<i>Asosiy admin sizni «➕ Масъул қўшиш» orqali ro‘yxatga oladi. "
+            "⚠️ Bu bo'lim faqat <b>mas'ul</b> uchun.\n\n"
+            "<i>Asosiy admin sizni «Mas'ul qo'shish» orqali ro'yxatga oladi. "
             "Railway ga ID kerak emas.</i>",
             parse_mode="HTML",
         )
@@ -54,7 +59,7 @@ async def _require_operator(message: Message) -> bool:
     return True
 
 
-@router.message(F.text.in_({"🚚 Юк келди", "🚚  Юк келди"}), F.chat.type == "private")
+@router.message(F.text.in_(BTN_YUK_KELDI_ALL), F.chat.type == "private")
 async def start_load_flow(message: Message, state: FSMContext) -> None:
     if not await _require_operator(message):
         return
@@ -62,7 +67,7 @@ async def start_load_flow(message: Message, state: FSMContext) -> None:
     if not settings()["group_id"]:
         await message.answer(
             "⚠️ <b>GROUP_ID</b> sozlanmagan.\n"
-            "Guruhda /id oling va Railway Variables ga qo‘ying.",
+            "Guruhda /id oling va Railway Variables ga qo'ying.",
             parse_mode="HTML",
         )
         return
@@ -97,8 +102,8 @@ async def start_load_flow(message: Message, state: FSMContext) -> None:
         photo_prompt(
             1,
             2,
-            "🚛 Машина фотоси",
-            "Yuk kelgan mashinani to‘liq ko‘rinadigan qilib surating",
+            "🚛 Mashina fotosuri",
+            "Yuk kelgan mashinani to'liq ko'rinadigan qilib surating",
         ),
         parse_mode="HTML",
         reply_markup=cancel_inline(),
@@ -117,8 +122,8 @@ async def start_car_photo(message: Message, state: FSMContext) -> None:
         photo_prompt(
             2,
             2,
-            "➕ Қўшимча расм",
-            "Kerakli qo‘shimcha surat (yorliq, hujjat, yuk holati va hokazo)",
+            "➕ Qo'shimcha rasm",
+            "Kerakli qo'shimcha surat (yorliq, hujjat, yuk holati va hokazo)",
         ),
         parse_mode="HTML",
         reply_markup=cancel_inline(),
@@ -160,7 +165,7 @@ async def start_extra_photo(message: Message, state: FSMContext, bot: Bot) -> No
     )
 
 
-@router.message(F.text.in_({"📊 Ҳолат", "📊  Ҳолат"}), F.chat.type == "private")
+@router.message(F.text.in_(BTN_HOLAT_ALL), F.chat.type == "private")
 async def status_panel(message: Message) -> None:
     if not await _require_operator(message):
         return
@@ -177,23 +182,23 @@ async def status_panel(message: Message) -> None:
     )
 
 
-@router.message(F.text.in_({"🏁 Якунлаш", "🏁  Якунлаш"}), F.chat.type == "private")
+@router.message(F.text.in_(BTN_YAKUNLASH_ALL), F.chat.type == "private")
 async def finish_prompt(message: Message) -> None:
     if not await _require_operator(message):
         return
     active = get_active_session()
     if not active or active.get("status") != "active":
         await message.answer(
-            "⚠️ Faol yuk yo‘q.",
+            "⚠️ Faol yuk yo'q.",
             reply_markup=_menu(message.from_user.id, can_finish=False),
         )
         return
 
     parts = list_participants(active["id"])
     await message.answer(
-        f"🏁 <b>Юк #{active['id']} ni yakunlaysizmi?</b>\n\n"
+        f"🏁 <b>Yuk #{active['id']} ni yakunlaysizmi?</b>\n\n"
         f"👷 Qatnashuvchilar: <b>{len(parts)}</b>\n\n"
-        "Tasdiqlangach — машина + қўшимча расм va <b>отчёт</b>.",
+        "Tasdiqlangach — mashina + qo'shimcha rasm va <b>hisobot</b>.",
         parse_mode="HTML",
         reply_markup=masul_finish_confirm(active["id"]),
     )
@@ -222,7 +227,7 @@ async def finish_confirmed(
     await state.set_state(LoadFinishStates.car_photo)
     await state.update_data(session_id=callback_data.session_id)
     await callback.message.answer(
-        photo_prompt(1, 2, "🚛 Машина — якун", "Yuk tugagach mashina holati"),
+        photo_prompt(1, 2, "🚛 Mashina — yakun", "Yuk tugagach mashina holati"),
         parse_mode="HTML",
         reply_markup=cancel_inline(),
     )
@@ -231,7 +236,7 @@ async def finish_confirmed(
 
 @router.callback_query(FinishCb.filter(F.confirm == 0))
 async def finish_cancel(callback: CallbackQuery) -> None:
-    await callback.message.edit_text("↩️ Yakunlash bekor qilindi.")
+    await callback.message.edit_text("↩️ Yakunlash bekor qilindi.", parse_mode="HTML")
     await callback.answer()
 
 
@@ -244,7 +249,7 @@ async def finish_car_photo(message: Message, state: FSMContext) -> None:
     update_session(sid, car_photo_end=message.photo[-1].file_id)
     await state.set_state(LoadFinishStates.extra_photo)
     await message.answer(
-        photo_prompt(2, 2, "➕ Қўшимча расм — якун", "Kerakli qo‘shimcha surat"),
+        photo_prompt(2, 2, "➕ Qo'shimcha rasm — yakun", "Kerakli qo'shimcha surat"),
         parse_mode="HTML",
         reply_markup=cancel_inline(),
     )

@@ -1,4 +1,4 @@
-"""Faol sessiya uchun live tаймер yangilash."""
+"""Faol sessiya uchun live taymer yangilash."""
 
 from __future__ import annotations
 

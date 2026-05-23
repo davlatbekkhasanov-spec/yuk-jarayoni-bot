@@ -13,6 +13,7 @@ from db import add_operator, get_active_session, list_operators, remove_operator
 from keyboards import masul_main_menu
 from roles import can_manage_yuk
 from states import AddOperatorStates
+from texts import BTN_MASUL_QOSH_ALL, BTN_MASULLAR_ALL
 from ui import operators_list_text
 
 router = Router()
@@ -26,7 +27,7 @@ def _menu(uid: int):
     )
 
 
-@router.message(F.text.in_({"👥 Масъуллар", "👥  Масъуллар"}), F.chat.type == "private")
+@router.message(F.text.in_(BTN_MASULLAR_ALL), F.chat.type == "private")
 async def list_ops(message: Message) -> None:
     if not is_admin(message.from_user.id):
         await message.answer("⚠️ Faqat asosiy admin uchun.", parse_mode="HTML")
@@ -39,18 +40,18 @@ async def list_ops(message: Message) -> None:
     )
 
 
-@router.message(F.text.in_({"➕ Масъул қўшиш", "➕  Масъул қўшиш"}), F.chat.type == "private")
+@router.message(F.text.in_(BTN_MASUL_QOSH_ALL), F.chat.type == "private")
 async def add_op_start(message: Message, state: FSMContext) -> None:
     if not is_admin(message.from_user.id):
         await message.answer("⚠️ Faqat asosiy admin uchun.", parse_mode="HTML")
         return
     await state.set_state(AddOperatorStates.waiting)
     await message.answer(
-        "➕ <b>Масъул қўшиш</b>\n\n"
+        "➕ <b>Mas'ul qo'shish</b>\n\n"
         "1) Odamning xabarini <b>reply</b> qiling, yoki\n"
         "2) <code>123456789</code> — Telegram ID yozing, yoki\n"
         "3) Kontaktni <b>forward</b> qiling.\n\n"
-        "<i>Ularga «Юк келди» va «Якунлаш» ochiladi.</i>\n\n"
+        "<i>Ularga «Yuk keldi» va «Yakunlash» ochiladi.</i>\n\n"
         "💡 Doimiy saqlash: Railway → <code>MASUL_IDS=id1,id2</code> "
         "(har deployda qayta tiklanadi).",
         parse_mode="HTML",
@@ -105,7 +106,7 @@ async def add_op_save(message: Message, state: FSMContext) -> None:
     await message.answer(
         f"✅ <b>{name}</b> mas'ul qilindi.\n"
         f"<code>{target_id}</code>\n\n"
-        "Endi u botda <b>🚚 Юк келди</b> va <b>🏁 Якунлаш</b> bosa oladi.",
+        "Endi u botda <b>Yuk keldi</b> va <b>Yakunlash</b> bosishi mumkin.",
         parse_mode="HTML",
         reply_markup=_menu(message.from_user.id),
     )

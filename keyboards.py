@@ -1,4 +1,4 @@
-"""Reply va Inline — premium tugmalar."""
+"""Reply va Inline tugmalar — lotin."""
 
 from __future__ import annotations
 
@@ -10,34 +10,48 @@ from aiogram.types import (
 )
 
 from callbacks import FinishCb, JoinCb, PauseCb
+from texts import (
+    BTN_HOLAT,
+    BTN_MASUL_QOSH,
+    BTN_MASULLAR,
+    BTN_YAKUNLASH,
+    BTN_YUK_KELDI,
+    INL_BEKOR,
+    INL_DAVOM,
+    INL_HA_YAKUN,
+    INL_ORQAGA,
+    INL_QATNASH,
+    INL_TANAFFUS,
+    INL_YAKUNLANDI,
+)
 
 
 def masul_main_menu(*, can_finish: bool, show_staff: bool = False) -> ReplyKeyboardMarkup:
-    row2 = [KeyboardButton(text="📊  Ҳолат")]
+    row2 = [KeyboardButton(text=BTN_HOLAT)]
     if can_finish:
-        row2.append(KeyboardButton(text="🏁  Якунлаш"))
+        row2.append(KeyboardButton(text=BTN_YAKUNLASH))
     keyboard = [
-        [KeyboardButton(text="🚚  Юк келди")],
+        [KeyboardButton(text=BTN_YUK_KELDI)],
         row2,
     ]
     if show_staff:
         keyboard.append(
             [
-                KeyboardButton(text="👥  Масъуллар"),
-                KeyboardButton(text="➕  Масъул қўшиш"),
+                KeyboardButton(text=BTN_MASULLAR),
+                KeyboardButton(text=BTN_MASUL_QOSH),
             ]
         )
     return ReplyKeyboardMarkup(
         keyboard=keyboard,
         resize_keyboard=True,
-        input_field_placeholder="✨ Menyudan tanlang…",
+        input_field_placeholder="Menyudan tanlang...",
     )
 
 
 def cancel_inline() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text="✖️  Бекор қилиш", callback_data="ui:cancel")]
+            [InlineKeyboardButton(text=INL_BEKOR, callback_data="ui:cancel")]
         ]
     )
 
@@ -47,7 +61,7 @@ def group_join_keyboard(session_id: int) -> InlineKeyboardMarkup:
         inline_keyboard=[
             [
                 InlineKeyboardButton(
-                    text="✅  МЕН ҚАТНАШАМАН",
+                    text=INL_QATNASH,
                     callback_data=JoinCb(session_id=session_id).pack(),
                 )
             ]
@@ -60,7 +74,7 @@ def group_join_closed(session_id: int) -> InlineKeyboardMarkup:
         inline_keyboard=[
             [
                 InlineKeyboardButton(
-                    text="🔒  Якунланди",
+                    text=INL_YAKUNLANDI,
                     callback_data=JoinCb(session_id=session_id, closed=1).pack(),
                 )
             ]
@@ -70,28 +84,16 @@ def group_join_closed(session_id: int) -> InlineKeyboardMarkup:
 
 def personal_timer_keyboard(session_id: int, *, paused: bool) -> InlineKeyboardMarkup:
     if paused:
-        return InlineKeyboardMarkup(
-            inline_keyboard=[
-                [
-                    InlineKeyboardButton(
-                        text="▶️  Давом этиш",
-                        callback_data=PauseCb(
-                            session_id=session_id, action="resume"
-                        ).pack(),
-                    )
-                ],
-            ]
+        btn = InlineKeyboardButton(
+            text=INL_DAVOM,
+            callback_data=PauseCb(session_id=session_id, action="resume").pack(),
         )
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
-            [
-                InlineKeyboardButton(
-                    text="⏸  Танaffus",
-                    callback_data=PauseCb(session_id=session_id, action="pause").pack(),
-                )
-            ],
-        ]
-    )
+    else:
+        btn = InlineKeyboardButton(
+            text=INL_TANAFFUS,
+            callback_data=PauseCb(session_id=session_id, action="pause").pack(),
+        )
+    return InlineKeyboardMarkup(inline_keyboard=[[btn]])
 
 
 def masul_finish_confirm(session_id: int) -> InlineKeyboardMarkup:
@@ -99,13 +101,13 @@ def masul_finish_confirm(session_id: int) -> InlineKeyboardMarkup:
         inline_keyboard=[
             [
                 InlineKeyboardButton(
-                    text="✅  Ҳа, якунлаш",
+                    text=INL_HA_YAKUN,
                     callback_data=FinishCb(session_id=session_id, confirm=1).pack(),
                 ),
             ],
             [
                 InlineKeyboardButton(
-                    text="↩️  Орқага",
+                    text=INL_ORQAGA,
                     callback_data=FinishCb(session_id=session_id, confirm=0).pack(),
                 ),
             ],

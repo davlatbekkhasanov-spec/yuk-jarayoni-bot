@@ -50,8 +50,8 @@ async def cmd_id(message: Message) -> None:
     extra = ""
     if message.chat.type in ("group", "supergroup"):
         extra = (
-            "\n\n✅ <b>Shu raqamni</b> Railway → <code>GROUP_ID</code> ga qo‘ying.\n"
-            "<i>Bot guruhda bo‘lishi shart.</i>"
+            "\n\n✅ <b>Shu raqamni</b> Railway → <code>GROUP_ID</code> ga qo'ying.\n"
+            "<i>Bot guruhda bo'lishi shart.</i>"
         )
     elif message.chat.type == "private" and not has_admins() and uid != "—":
         extra = f"\n\n⚙️ Railway uchun:\n<code>ADMIN_ID={uid}</code>"
@@ -85,7 +85,7 @@ async def cmd_check_group(message: Message, bot: Bot) -> None:
             f"✅ <b>Guruh topildi</b>\n\n"
             f"📛 <b>{title}</b>\n"
             f"{parse_group_id_hint()}{fix}\n\n"
-            "Endi <b>🚚 Юк келди</b> ishlashi kerak.",
+            "Endi <b>Yuk keldi</b> ishlashi kerak.",
             parse_mode="HTML",
         )
     except GroupConfigError:
@@ -102,7 +102,7 @@ async def ui_cancel(callback: CallbackQuery, state: FSMContext) -> None:
         cancel_draft_session(int(sid))
     await state.clear()
     await callback.message.edit_text(
-        "❌ <b>Бекор қилинди</b>",
+        "❌ <b>Bekor qilindi</b>",
         parse_mode="HTML",
     )
     if can_manage_yuk(callback.from_user.id):

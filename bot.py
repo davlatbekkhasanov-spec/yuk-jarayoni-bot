@@ -1,4 +1,4 @@
-"""Юк жараёни — Telegram bot."""
+"""Yuk jarayoni — Telegram bot."""
 
 from __future__ import annotations
 
@@ -45,7 +45,7 @@ async def main() -> None:
             len(cfg["masul_ids"]),
         )
     if added_ops:
-        log.info("Operators jadvaliga yangi qo‘shildi: %s", added_ops)
+        log.info("Operators jadvaliga yangi qo'shildi: %s", added_ops)
     bot_probe = Bot(
         token=cfg["token"],
         default=DefaultBotProperties(parse_mode=ParseMode.HTML),

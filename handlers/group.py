@@ -71,7 +71,7 @@ async def on_join(callback: CallbackQuery, callback_data: JoinCb, bot: Bot) -> N
     user = callback.from_user
     if participant_exists(callback_data.session_id, user.id):
         await callback.answer(
-            "✅ Siz ro‘yxatdasiz — shaxsiy chatda ⏸/▶️ tugmalardan foydalaning",
+            "✅ Siz ro'yxatdasiz — shaxsiy chatda tanaffus/davom tugmalari",
             show_alert=True,
         )
         return
@@ -86,18 +86,18 @@ async def on_join(callback: CallbackQuery, callback_data: JoinCb, bot: Bot) -> N
         username=username,
     )
     if not added:
-        await callback.answer("✅ Allaqachon ro‘yxatda", show_alert=True)
+        await callback.answer("✅ Allaqachon ro'yxatda", show_alert=True)
         return
 
     if not await _send_or_update_personal(bot, callback_data.session_id, user.id):
         await callback.answer(
-            "⚠️ Bot bilan shaxsiy chatda /start bosing, keyin qayta «Қатнашиш»",
+            "⚠️ Bot bilan shaxsiy chatda /start bosing, keyin qayta qatnashing",
             show_alert=True,
         )
         return
 
     await refresh_group_status(bot, callback_data.session_id)
-    await callback.answer("✅ Қатнашдингиз! Shaxsiy chatda tаймер ochiq", show_alert=False)
+    await callback.answer("✅ Qatnashdingiz! Shaxsiy chatda taymer ochiq", show_alert=False)
 
 
 @router.callback_query(PauseCb.filter())
@@ -111,7 +111,7 @@ async def on_pause_toggle(
         return
 
     if not participant_exists(callback_data.session_id, user.id):
-        await callback.answer("Avval «Қатнашиш» bosing", show_alert=True)
+        await callback.answer("Avval qatnashing tugmasini bosing", show_alert=True)
         return
 
     action = callback_data.action
@@ -120,13 +120,13 @@ async def on_pause_toggle(
         if not ok:
             await callback.answer("⏸ Allaqachon tanaffusda", show_alert=True)
             return
-        await callback.answer("⏸ Танaffus — tаймер to‘xtadi")
+        await callback.answer("⏸ Tanaffus — taymer to'xtadi")
     elif action == "resume":
         ok = resume_participant(callback_data.session_id, user.id)
         if not ok:
             await callback.answer("▶️ Allaqachon ishlayapsiz", show_alert=True)
             return
-        await callback.answer("▶️ Давом etildi")
+        await callback.answer("▶️ Davom etildi")
     else:
         await callback.answer()
         return

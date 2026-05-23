@@ -7,17 +7,16 @@ import logging
 from aiogram import Bot
 from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError
 
-log = logging.getLogger(__name__)
-
 from config import get_group_id, set_resolved_group_id, settings
+
+log = logging.getLogger(__name__)
 
 
 class GroupConfigError(Exception):
-    """GROUP_ID yoki bot huquqlari noto‘g‘ri."""
+    """GROUP_ID yoki bot huquqlari noto'g'ri."""
 
 
 def supergroup_id_candidate(group_id: int) -> int | None:
-    """Eski guruh ID → supergroup (-100...) format."""
     s = str(group_id)
     if s.startswith("-") and not s.startswith("-100"):
         return int("-100" + s[1:])
@@ -36,14 +35,14 @@ def parse_group_id_hint() -> str:
     gid = settings()["group_id"]
     if gid is None:
         return (
-            "Railway da <code>GROUP_ID</code> yo‘q.\n"
-            "<i>«Chat ID» nomli alohida o‘zgaruvchi bot tomonidan o‘qilmaydi — "
-            "qiymatni aynan <code>GROUP_ID</code> ga yozing.</i>"
+            "Railway da <code>GROUP_ID</code> yo'q.\n"
+            "<i>«Chat ID» nomli alohida o'zgaruvchi o'qilmaydi — "
+            "qiymatni <code>GROUP_ID</code> ga yozing.</i>"
         )
     lines = [f"Hozirgi <code>GROUP_ID={gid}</code>"]
     alt = supergroup_id_candidate(gid)
     if alt:
-        lines.append(f"Sinab ko‘ring: <code>GROUP_ID={alt}</code>")
+        lines.append(f"Sinab ko'ring: <code>GROUP_ID={alt}</code>")
     resolved = get_group_id()
     if resolved and resolved != gid:
         lines.append(f"Ishlayotgan ID: <code>{resolved}</code>")
@@ -57,28 +56,22 @@ def group_fix_message(*, detail: str = "") -> str:
     extra = f"\n\n<i>{detail}</i>" if detail else ""
     return (
         f"{banner('ULANISH XATOSI', icon='⚠️')}\n\n"
-        f"{block_quote('Guruhga yuborib bo‘lmadi')}\n\n"
+        f"{block_quote('Guruhga yuborib bo\'lmadi')}\n\n"
         "<b>Telegram «chat not found» degani:</b>\n"
-        "• <code>GROUP_ID</code> noto‘g‘ri (shaxsiy ID emas!)\n"
-        "• Bot guruhda yo‘q\n"
+        "• <code>GROUP_ID</code> noto'g'ri (shaxsiy ID emas)\n"
+        "• Bot guruhda yo'q\n"
         "• Bot guruhdan chiqarilgan\n\n"
         "<b>Qanday tuzatish:</b>\n"
-        "1️⃣ Botni <b>ishchi guruhga</b> qo‘shing\n"
-        "2️⃣ Guruhda <code>/id</code> yuboring — <b>Chat ID</b> ni oling\n"
+        "1️⃣ Botni ishchi guruhga qo'shing\n"
+        "2️⃣ Guruhda <code>/id</code> — Chat ID ni oling\n"
         "   (odatda <code>-100...</code> bilan boshlanadi)\n"
-        "3️⃣ Railway → faqat <code>GROUP_ID</code> (boshqa nom emas!)\n"
+        "3️⃣ Railway → faqat <code>GROUP_ID</code>\n"
         "4️⃣ <b>Redeploy</b>\n\n"
-        "⚠️ <i>«Chat ID» alohida variable — bot uni o‘qimaydi. "
-        "Raqam <code>GROUP_ID</code> ichida bo‘lishi kerak.</i>\n\n"
         f"{hint}{extra}"
     )
 
 
 async def verify_group_access(bot: Bot) -> str:
-    """
-    Guruh mavjudligi va bot huquqini tekshiradi.
-    Muvaffaqiyatda guruh nomini qaytaradi.
-    """
     configured = settings()["group_id"]
     if not configured:
         raise GroupConfigError("GROUP_ID sozlanmagan")
@@ -90,12 +83,11 @@ async def verify_group_access(bot: Bot) -> str:
             set_resolved_group_id(chat_id)
             if chat_id != configured:
                 log.info(
-                    "GROUP_ID %s o‘rniga supergroup ID ishlatildi: %s",
+                    "GROUP_ID %s o'rniga supergroup ID: %s",
                     configured,
                     chat_id,
                 )
-            title = chat.title or chat.full_name or str(chat_id)
-            return title
+            return chat.title or chat.full_name or str(chat_id)
         except TelegramBadRequest as e:
             last_err = e
             if "chat not found" not in str(e).lower():
