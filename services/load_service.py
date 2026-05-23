@@ -8,8 +8,7 @@ from typing import Any
 from aiogram import Bot
 from aiogram.types import InputMediaPhoto
 
-from config import get_group_id, settings
-from services.group_check import GroupConfigError, verify_group_access
+from config import get_group_id
 from db import (
     get_active_session,
     get_participant,
@@ -17,10 +16,11 @@ from db import (
     list_participants,
     update_session,
 )
+from kaizen import compute_kaizen
 from keyboards import group_join_closed, group_join_keyboard, personal_timer_keyboard
+from services.group_check import GroupConfigError, verify_group_access
 from time_util import now_iso
 from ui import (
-    final_report,
     group_load_card,
     kaizen_block,
     media_caption_end,
@@ -29,9 +29,69 @@ from ui import (
     ranking_block,
     report_caption_short,
 )
-from kaizen import compute_kaizen
 
 log = logging.getLogger(__name__)
+
+
+def _album_msg_ids(session: dict[str, Any]) -> list[int]:
+    raw = session.get("group_album_msg_ids")
+    if raw:
+        return [int(x) for x in str(raw).split(",") if x.strip().isdigit()]
+    first = session.get("group_album_msg_id")
+    if first:
+        return [int(first)]
+    return []
+
+
+def _build_start_album(session: dict[str, Any], session_id: int) -> list[InputMediaPhoto]:
+    media: list[InputMediaPhoto] = []
+    if session.get("car_photo_start"):
+        media.append(
+            InputMediaPhoto(
+                media=session["car_photo_start"],
+                caption=media_caption_start("car", session_id),
+                parse_mode="HTML",
+            )
+        )
+    if session.get("unload_photo_start"):
+        media.append(
+            InputMediaPhoto(
+                media=session["unload_photo_start"],
+                caption=media_caption_start("extra", session_id),
+                parse_mode="HTML",
+            )
+        )
+    return media
+
+
+def _build_finish_album(session: dict[str, Any], session_id: int) -> list[InputMediaPhoto]:
+    """4 ta surat: mashina + qo'shimcha (boshlanish va yakun)."""
+    items: list[tuple[str, str, str]] = [
+        ("car_photo_start", "car", "start"),
+        ("unload_photo_start", "extra", "start"),
+        ("car_photo_end", "car", "end"),
+        ("unload_photo_end", "extra", "end"),
+    ]
+    media: list[InputMediaPhoto] = []
+    for field, kind, phase in items:
+        file_id = session.get(field)
+        if not file_id:
+            continue
+        cap = (
+            media_caption_start(kind, session_id)
+            if phase == "start"
+            else media_caption_end(kind)
+        )
+        media.append(InputMediaPhoto(media=file_id, caption=cap, parse_mode="HTML"))
+    return media
+
+
+async def _delete_album_messages(bot: Bot, chat_id: int, session: dict[str, Any]) -> None:
+    for mid in _album_msg_ids(session):
+        try:
+            await bot.delete_message(chat_id=chat_id, message_id=mid)
+        except Exception as e:
+            log.debug("delete album msg %s: %s", mid, e)
 
 
 async def publish_load_to_group(bot: Bot, session_id: int) -> None:
@@ -43,19 +103,12 @@ async def publish_load_to_group(bot: Bot, session_id: int) -> None:
     if not group_id:
         raise GroupConfigError("GROUP_ID sozlanmagan")
 
-    media = [
-        InputMediaPhoto(
-            media=session["car_photo_start"],
-            caption=media_caption_start("car", session_id),
-            parse_mode="HTML",
-        ),
-        InputMediaPhoto(
-            media=session["unload_photo_start"],
-            caption=media_caption_start("extra", session_id),
-            parse_mode="HTML",
-        ),
-    ]
-    album = await bot.send_media_group(chat_id=group_id, media=media)
+    media = _build_start_album(session, session_id)
+    if not media:
+        raise GroupConfigError("Suratlar topilmadi")
+
+    album = await bot.send_media_group(chat_id=group_id, media=media[:10])
+    album_ids = ",".join(str(m.message_id) for m in album)
 
     status_text = group_load_card(session=session, participants=[], phase="active")
     status_msg = await bot.send_message(
@@ -70,12 +123,15 @@ async def publish_load_to_group(bot: Bot, session_id: int) -> None:
         status="active",
         group_chat_id=group_id,
         group_album_msg_id=album[0].message_id if album else None,
+        group_album_msg_ids=album_ids,
         group_status_msg_id=status_msg.message_id,
         started_at=now_iso(),
     )
 
 
-async def refresh_group_status(bot: Bot, session_id: int, *, phase: str = "active") -> None:
+async def refresh_group_status(
+    bot: Bot, session_id: int, *, phase: str = "active"
+) -> None:
     session = get_session(session_id)
     if not session:
         return
@@ -87,11 +143,10 @@ async def refresh_group_status(bot: Bot, session_id: int, *, phase: str = "activ
     participants = list_participants(session_id)
     text = group_load_card(session=session, participants=participants, phase=phase)
     status = session.get("status") or "active"
-    markup = (
-        group_join_closed(session_id)
-        if status in ("finishing", "completed")
-        else group_join_keyboard(session_id)
-    )
+    if status in ("finishing", "completed"):
+        markup = group_join_closed(session_id)
+    else:
+        markup = group_join_keyboard(session_id)
 
     try:
         await bot.edit_message_text(
@@ -144,78 +199,42 @@ async def publish_final_report(bot: Bot, session_id: int) -> None:
 
     participants = list_participants(session_id)
     finished_iso = session.get("finished_at") or now_iso()
-    report_full = final_report(session=session, participants=participants)
-    caption_short = report_caption_short(session, participants)
+    m = compute_kaizen(
+        session=session, participants=participants, finished_iso=finished_iso
+    )
 
-    media = []
-    if session.get("car_photo_start"):
-        media.append(
-            InputMediaPhoto(
-                media=session["car_photo_start"],
-                caption=media_caption_start("car", session_id),
-                parse_mode="HTML",
-            )
-        )
-    if session.get("unload_photo_start"):
-        media.append(
-            InputMediaPhoto(
-                media=session["unload_photo_start"],
-                caption=media_caption_start("extra", session_id),
-                parse_mode="HTML",
-            )
-        )
-    if session.get("car_photo_end"):
-        media.append(
-            InputMediaPhoto(
-                media=session["car_photo_end"],
-                caption=media_caption_end("car"),
-                parse_mode="HTML",
-            )
-        )
-    if session.get("unload_photo_end"):
-        media.append(
-            InputMediaPhoto(
-                media=session["unload_photo_end"],
-                caption=media_caption_end("extra"),
-                parse_mode="HTML",
-            )
-        )
+    await _delete_album_messages(bot, group_id, session)
 
-    if media:
-        media[0].caption = caption_short[:1020]
-        media[0].parse_mode = "HTML"
-        await bot.send_media_group(chat_id=group_id, media=media[:10])
-    else:
-        await bot.send_message(
-            chat_id=group_id,
-            text=caption_short,
-            parse_mode="HTML",
-        )
+    album = _build_finish_album(session, session_id)
+    caption = report_caption_short(session, participants)[:1020]
 
-    if len(report_full) > 4000:
-        m = compute_kaizen(
-            session=session,
-            participants=participants,
-            finished_iso=finished_iso,
-        )
-        await bot.send_message(
-            chat_id=group_id,
-            text=ranking_block(participants, finished_iso=finished_iso),
-            parse_mode="HTML",
-        )
-        await bot.send_message(
-            chat_id=group_id,
-            text=kaizen_block(m),
-            parse_mode="HTML",
+    if album:
+        album[0].caption = caption
+        album[0].parse_mode = "HTML"
+        for i in range(1, len(album)):
+            album[i].caption = None
+        sent = await bot.send_media_group(chat_id=group_id, media=album[:10])
+        album_ids = ",".join(str(msg.message_id) for msg in sent)
+        update_session(
+            session_id,
+            group_album_msg_id=sent[0].message_id if sent else None,
+            group_album_msg_ids=album_ids,
         )
     else:
-        await bot.send_message(
-            chat_id=group_id,
-            text=report_full,
-            parse_mode="HTML",
-        )
+        await bot.send_message(chat_id=group_id, text=caption, parse_mode="HTML")
 
-    await refresh_group_status(bot, session_id, phase="finishing")
+    await bot.send_message(
+        chat_id=group_id,
+        text=ranking_block(participants, finished_iso=finished_iso),
+        parse_mode="HTML",
+    )
+    await bot.send_message(
+        chat_id=group_id,
+        text=kaizen_block(m),
+        parse_mode="HTML",
+    )
+
+    await refresh_group_status(bot, session_id, phase="completed")
 
 
 def active_session_for_user(user_id: int) -> dict[str, Any] | None:

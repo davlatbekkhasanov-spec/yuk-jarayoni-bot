@@ -71,6 +71,14 @@ def db():
         conn.close()
 
 
+def _migrate_sessions(conn: sqlite3.Connection) -> None:
+    cols = {row[1] for row in conn.execute("PRAGMA table_info(load_sessions)")}
+    if "group_album_msg_ids" not in cols:
+        conn.execute(
+            "ALTER TABLE load_sessions ADD COLUMN group_album_msg_ids TEXT"
+        )
+
+
 def _migrate_participants(conn: sqlite3.Connection) -> None:
     cols = {row[1] for row in conn.execute("PRAGMA table_info(participants)")}
     if "pause_total_sec" not in cols:
@@ -121,6 +129,7 @@ def init_db() -> int:
     """DB yaratadi; qaytaradi: env dan yangi qo‘shilgan operatorlar soni."""
     with db() as conn:
         conn.executescript(SCHEMA)
+        _migrate_sessions(conn)
         _migrate_participants(conn)
         return sync_operators_from_env(conn)
 

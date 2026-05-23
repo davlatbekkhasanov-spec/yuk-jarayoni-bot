@@ -10,6 +10,15 @@ from texts import BRAND, INL_DAVOM, INL_QATNASH, INL_TANAFFUS
 from time_util import display_now, elapsed_seconds, format_duration, now_iso
 from timer_util import is_paused, pause_seconds_total, work_seconds
 
+_live_pulse_i = 0
+
+
+def live_pulse() -> str:
+    """Miltillovchi LIVE nuqta (har yangilanishda almashadi)."""
+    global _live_pulse_i
+    _live_pulse_i += 1
+    return "🔴" if _live_pulse_i % 2 else "⚫"
+
 
 def he(text: object) -> str:
     return html_lib.escape(str(text or ""))
@@ -118,10 +127,10 @@ def group_load_card(
     status = session.get("status") or "active"
     started = session.get("started_at") or ""
 
-    if phase == "finishing":
-        head_icon, head_title = "🏁", "YUK YAKUNLANMOQDA"
+    if phase in ("finishing", "completed"):
+        head_icon, head_title = "✅", "JARAYON YAKUNLANDI"
     else:
-        head_icon, head_title = "🚚", "YUK KELDI  ·  LIVE"
+        head_icon, head_title = live_pulse(), "YUK KELDI"
 
     active_n, paused_n, avg_sec = _team_stats(participants)
     cycle = elapsed_seconds(started) if started else 0
@@ -177,7 +186,14 @@ def group_load_card(
             ]
         )
 
-    lines.extend(["", sep(), f"<i>🕐 {he(display_now())}  ·  {he(BRAND)}</i>"])
+    pulse = live_pulse()
+    if phase in ("finishing", "completed"):
+        footer_live = ""
+    else:
+        footer_live = f"  ·  {pulse} <b>LIVE</b>"
+    lines.extend(
+        ["", sep(), f"<i>🕐 {he(display_now())}{footer_live}  ·  {he(BRAND)}</i>"]
+    )
     return "\n".join(lines)
 
 
@@ -285,11 +301,15 @@ def report_caption_short(session: dict[str, Any], participants: list) -> str:
         session=session, participants=participants, finished_iso=finished
     )
     return (
-        f"📋  <b>HISOBOT #{session['id']}</b>\n\n"
-        f"⏱  Jami: <b>{format_duration(m.cycle_sec)}</b>\n"
-        f"👤  O'rtacha: <b>{avg_minutes(m.avg_work_sec)}</b>\n"
-        f"{m.grade_icon}  Kaizen: <b>{m.kaizen_score}/100</b>\n\n"
-        "<i>Batafsil — keyingi xabar</i>"
+        f"✅  <b>JARAYON YAKUNLANDI</b>  ·  #{session['id']}\n"
+        f"{sep()}\n"
+        f"📸  4 ta surat: boshlanish + yakun\n\n"
+        f"📊  <b>KAIZEN</b>\n"
+        f"⏱  Jami tushirish: <b>{format_duration(m.cycle_sec)}</b>\n"
+        f"👤  O'rtacha / xodim: <b>{avg_minutes(m.avg_work_sec)}</b>\n"
+        f"👷  Jamoa ish vaqti: <b>{format_duration(m.total_work_sec)}</b>\n"
+        f"{m.grade_icon}  Ball: <b>{m.kaizen_score}/100</b>  ({he(m.grade)})\n\n"
+        f"<i>📋 To'liq Kaizen — keyingi xabar</i>"
     )
 
 
@@ -338,7 +358,7 @@ def media_caption_start(kind: str, session_id: int) -> str:
         "extra": ("➕", "QO'SHIMCHA"),
     }
     icon, title = labels.get(kind, ("📷", "SURAT"))
-    return f"{icon}  <b>{title}</b>  ·  boshlanish\n🪪  #{session_id}  ·  <b>LIVE</b>"
+    return f"{icon}  <b>{title}</b>  ·  boshlanish\n🪪  #{session_id}"
 
 
 def media_caption_end(kind: str) -> str:
