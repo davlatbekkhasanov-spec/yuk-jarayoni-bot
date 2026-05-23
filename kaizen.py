@@ -1,4 +1,4 @@
-"""Kaizen metrikalari — yakuniy hisobot."""
+"""Kaizen metrikalari — faqat vaqt (foiz/ball keyinroq qo'shiladi)."""
 
 from __future__ import annotations
 
@@ -20,22 +20,6 @@ class KaizenMetrics:
     fastest_sec: int
     slowest_name: str
     slowest_sec: int
-    utilization_pct: int
-    pause_share_pct: int
-    parallel_pct: int
-    kaizen_score: int
-    grade: str
-    grade_icon: str
-
-
-def _grade(score: int) -> tuple[str, str]:
-    if score >= 90:
-        return "A'LO", "🌟"
-    if score >= 75:
-        return "YAXSHI", "✅"
-    if score >= 60:
-        return "O'RTA", "📈"
-    return "RISK", "⚠️"
 
 
 def compute_kaizen(
@@ -71,24 +55,6 @@ def compute_kaizen(
         fastest_name, fastest_sec = "—", 0
         slowest_name, slowest_sec = "—", 0
 
-    denom = max(total_work + total_pause, 1)
-    pause_share = int(round(100 * total_pause / denom))
-    parallel = 0
-    if cycle > 0 and n > 0:
-        parallel = min(100, int(round(100 * total_work / (cycle * n))))
-    utilization = min(100, int(round(100 * total_work / max(cycle, 1)))) if cycle else 0
-
-    score = 50
-    if n > 0 and cycle > 0:
-        score = int(
-            0.35 * parallel
-            + 0.35 * max(0, 100 - pause_share)
-            + 0.15 * min(100, n * 20)
-            + 0.15 * utilization
-        )
-    score = max(0, min(100, score))
-    grade, icon = _grade(score)
-
     return KaizenMetrics(
         cycle_sec=cycle,
         total_work_sec=total_work,
@@ -99,12 +65,6 @@ def compute_kaizen(
         fastest_sec=fastest_sec,
         slowest_name=slowest_name,
         slowest_sec=slowest_sec,
-        utilization_pct=utilization,
-        pause_share_pct=pause_share,
-        parallel_pct=parallel,
-        kaizen_score=score,
-        grade=grade,
-        grade_icon=icon,
     )
 
 

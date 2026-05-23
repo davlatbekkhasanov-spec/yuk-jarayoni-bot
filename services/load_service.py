@@ -27,22 +27,10 @@ from ui import (
     media_caption_start,
     personal_timer_card,
     ranking_block,
+    report_caption_short,
 )
 
 log = logging.getLogger(__name__)
-
-
-def _album_reply_message_id(session: dict[str, Any]) -> int | None:
-    """Boshlang'ich albomning birinchi surat xabari ID."""
-    mid = session.get("group_album_msg_id")
-    if mid:
-        return int(mid)
-    raw = session.get("group_album_msg_ids")
-    if raw:
-        part = str(raw).split(",")[0].strip()
-        if part.isdigit():
-            return int(part)
-    return None
 
 
 def _build_start_album(session: dict[str, Any], session_id: int) -> list[InputMediaPhoto]:
@@ -66,61 +54,60 @@ def _build_start_album(session: dict[str, Any], session_id: int) -> list[InputMe
     return media
 
 
-async def _send_end_photos_reply(
+def _build_end_album(session: dict[str, Any], session_id: int) -> list[InputMediaPhoto]:
+    media: list[InputMediaPhoto] = []
+    if session.get("car_photo_end"):
+        media.append(
+            InputMediaPhoto(
+                media=session["car_photo_end"],
+                caption=media_caption_end("car"),
+                parse_mode="HTML",
+            )
+        )
+    if session.get("unload_photo_end"):
+        media.append(
+            InputMediaPhoto(
+                media=session["unload_photo_end"],
+                caption=media_caption_end("extra"),
+                parse_mode="HTML",
+            )
+        )
+    return media
+
+
+async def _send_end_album_to_status(
     bot: Bot,
     *,
     chat_id: int,
     session: dict[str, Any],
     session_id: int,
+    participants: list,
 ) -> None:
-    """
-    Yakun suratlari — boshidagi albomga reply.
-    Media group reply Telegramda ishonchsiz; alohida send_photo ishlatiladi.
-    """
-    reply_id = _album_reply_message_id(session)
-    items: list[tuple[str, str]] = []
-    if session.get("car_photo_end"):
-        items.append(("car", session["car_photo_end"]))
-    if session.get("unload_photo_end"):
-        items.append(("extra", session["unload_photo_end"]))
-    if not items:
+    """Yakun 2 surat — albom (kichik grid), status SMS ga reply."""
+    end_album = _build_end_album(session, session_id)
+    if not end_album:
         log.warning("session %s: yakun suratlari yo'q", session_id)
         return
 
-    reply_params = (
-        ReplyParameters(message_id=reply_id) if reply_id else None
-    )
-    if not reply_params:
+    caption = report_caption_short(session, participants)[:1020]
+    end_album[0].caption = caption
+    end_album[0].parse_mode = "HTML"
+    if len(end_album) > 1:
+        end_album[1].caption = None
+
+    status_id = session.get("group_status_msg_id")
+    kw: dict[str, Any] = {"chat_id": chat_id, "media": end_album[:10]}
+    if status_id:
+        kw["reply_parameters"] = ReplyParameters(message_id=int(status_id))
+
+    try:
+        await bot.send_media_group(**kw)
+    except Exception as e:
         log.warning(
-            "session %s: group_album_msg_id yo'q — reply bo'lmaydi", session_id
+            "yakun albom (status reply) yuborilmadi, replysiz: %s", e
         )
-
-    for i, (kind, file_id) in enumerate(items):
-        if i == 0:
-            caption = f"🏁  <b>YAKUN SURATLARI</b>  ·  #{session_id}"
-        else:
-            caption = media_caption_end(kind)
-
-        kw: dict[str, Any] = {
-            "chat_id": chat_id,
-            "photo": file_id,
-            "caption": caption,
-            "parse_mode": "HTML",
-        }
-        if reply_params:
-            kw["reply_parameters"] = reply_params
-
-        try:
-            await bot.send_photo(**kw)
-        except Exception as e:
-            log.warning(
-                "yakun surat reply bilan yuborilmadi (kind=%s, reply=%s): %s",
-                kind,
-                reply_id,
-                e,
-            )
-            kw.pop("reply_parameters", None)
-            await bot.send_photo(**kw)
+        kw.pop("reply_parameters", None)
+        await bot.send_media_group(chat_id=chat_id, media=end_album[:10])
 
 
 async def publish_load_to_group(bot: Bot, session_id: int) -> None:
@@ -156,12 +143,6 @@ async def publish_load_to_group(bot: Bot, session_id: int) -> None:
         group_album_msg_ids=album_ids,
         group_status_msg_id=status_msg.message_id,
         started_at=now_iso(),
-    )
-    log.info(
-        "session %s: bosh albom msg_id=%s ids=%s",
-        session_id,
-        first_id,
-        album_ids,
     )
 
 
@@ -239,15 +220,21 @@ async def publish_final_report(bot: Bot, session_id: int) -> None:
         session=session, participants=participants, finished_iso=finished_iso
     )
 
-    # 1) Yakun suratlari — bosh albomga reply (avval, statusdan oldin)
-    await _send_end_photos_reply(
-        bot, chat_id=group_id, session=session, session_id=session_id
-    )
-
-    # 2) Status + Kaizen kartasi
+    # 1) Status SMS (Kaizen bilan)
     await refresh_group_status(bot, session_id, phase="completed")
 
-    # 3) To'liq hisobot — status xabariga reply
+    session = get_session(session_id) or session
+
+    # 2) Yakun 2 surat — albom, status xabariga reply (katta emas, bog'langan)
+    await _send_end_album_to_status(
+        bot,
+        chat_id=group_id,
+        session=session,
+        session_id=session_id,
+        participants=participants,
+    )
+
+    # 3) Reyting + batafsil Kaizen — status ga reply
     report_text = (
         f"{ranking_block(participants, finished_iso=finished_iso)}\n\n"
         f"{kaizen_block(m)}"

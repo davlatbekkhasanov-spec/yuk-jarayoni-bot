@@ -200,7 +200,6 @@ def group_load_card(
             finished_iso=finished_iso,
         )
         lines.extend(["", kaizen_summary_compact(m)])
-        lines.append(f"\n<i>📸 Yakun suratlari — yuqoridagi albomga javob</i>")
 
     pulse = live_pulse()
     if phase in ("finishing", "completed"):
@@ -247,35 +246,26 @@ def personal_timer_card(
 
 
 def kaizen_summary_compact(m: KaizenMetrics) -> str:
-    """Status kartasida ko'rinadigan qisqa Kaizen."""
+    """Status kartasida ko'rinadigan qisqa Kaizen (faqat vaqt)."""
     return (
         f"{sep()}\n"
         f"📊  <b>KAIZEN</b>\n"
         f"⏱  Jami tushirish: <b>{format_duration(m.cycle_sec)}</b>\n"
         f"👤  O'rtacha / xodim: <b>{avg_minutes(m.avg_work_sec)}</b>\n"
         f"👷  Jamoa ish vaqti: <b>{format_duration(m.total_work_sec)}</b>\n"
-        f"☕  Tanaffus: <b>{format_duration(m.total_pause_sec)}</b>\n"
-        f"{m.grade_icon}  Ball: <b>{m.kaizen_score}/100</b>  ·  <b>{he(m.grade)}</b>"
+        f"☕  Tanaffus: <b>{format_duration(m.total_pause_sec)}</b>"
     )
 
 
 def kaizen_block(m: KaizenMetrics) -> str:
     return (
         f"{banner('KAIZEN  ·  YAKUNIY TAHLIL', icon='📊', width=26)}\n\n"
-        f"{metric_card('⏱', 'Jami tushirish vaqti', format_duration(m.cycle_sec), bar_pct=min(100, m.utilization_pct))}\n\n"
+        f"{metric_card('⏱', 'Jami tushirish vaqti', format_duration(m.cycle_sec))}\n\n"
         f"{metric_card('👤', 'Bir xodim o\'rtacha', avg_minutes(m.avg_work_sec))}\n\n"
         f"{metric_card('👷', 'Jamoa jami ish vaqti', format_duration(m.total_work_sec))}\n\n"
-        f"{metric_card('☕', 'Tanaffus (muda)', format_duration(m.total_pause_sec), bar_pct=m.pause_share_pct)}\n\n"
-        "┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n"
-        "<b>📐 Kaizen ko'rsatkichlari</b>\n\n"
-        f"⚙️  <b>Parallel samaradorlik</b>\n    <code>{glow_bar(m.parallel_pct)}</code>  <b>{m.parallel_pct}%</b>\n\n"
-        f"📉  <b>Muda ulushi</b> (tanaffus)\n    <code>{glow_bar(m.pause_share_pct)}</code>  <b>{m.pause_share_pct}%</b>\n\n"
-        f"🚀  <b>Vaqt samaradorligi</b>\n    <code>{glow_bar(m.utilization_pct)}</code>  <b>{m.utilization_pct}%</b>\n\n"
+        f"{metric_card('☕', 'Tanaffus', format_duration(m.total_pause_sec))}\n\n"
         f"🏅  <b>Eng tez:</b> {he(m.fastest_name)} — {format_duration(m.fastest_sec)}\n"
-        f"🐢  <b>Eng sekin:</b> {he(m.slowest_name)} — {format_duration(m.slowest_sec)}\n\n"
-        f"{sep('═', 26)}\n"
-        f"{m.grade_icon}  <b>KAIZEN BALLI: {m.kaizen_score}/100</b>  ·  <b>{he(m.grade)}</b>\n"
-        f"{sep('═', 26)}"
+        f"🐢  <b>Eng sekin:</b> {he(m.slowest_name)} — {format_duration(m.slowest_sec)}"
     )
 
 
@@ -330,15 +320,10 @@ def report_caption_short(session: dict[str, Any], participants: list) -> str:
         session=session, participants=participants, finished_iso=finished
     )
     return (
-        f"✅  <b>JARAYON YAKUNLANDI</b>  ·  #{session['id']}\n"
+        f"🏁  <b>YAKUN SURATLARI</b>  ·  #{session['id']}\n"
         f"{sep()}\n"
-        f"📸  4 ta surat: boshlanish + yakun\n\n"
-        f"📊  <b>KAIZEN</b>\n"
-        f"⏱  Jami tushirish: <b>{format_duration(m.cycle_sec)}</b>\n"
-        f"👤  O'rtacha / xodim: <b>{avg_minutes(m.avg_work_sec)}</b>\n"
-        f"👷  Jamoa ish vaqti: <b>{format_duration(m.total_work_sec)}</b>\n"
-        f"{m.grade_icon}  Ball: <b>{m.kaizen_score}/100</b>  ({he(m.grade)})\n\n"
-        f"<i>📋 To'liq Kaizen — keyingi xabar</i>"
+        f"⏱  Jami: <b>{format_duration(m.cycle_sec)}</b>  ·  "
+        f"👤  O'rtacha: <b>{avg_minutes(m.avg_work_sec)}</b>"
     )
 
 
