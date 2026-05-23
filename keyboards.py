@@ -9,7 +9,7 @@ from aiogram.types import (
     ReplyKeyboardMarkup,
 )
 
-from callbacks import JoinCb, FinishCb
+from callbacks import FinishCb, JoinCb, PauseCb
 
 
 def masul_main_menu(*, can_finish: bool) -> ReplyKeyboardMarkup:
@@ -54,6 +54,32 @@ def group_join_closed(session_id: int) -> InlineKeyboardMarkup:
                 InlineKeyboardButton(
                     text="🔒 Якунланди",
                     callback_data=JoinCb(session_id=session_id, closed=1).pack(),
+                )
+            ]
+        ]
+    )
+
+
+def personal_timer_keyboard(session_id: int, *, paused: bool) -> InlineKeyboardMarkup:
+    if paused:
+        return InlineKeyboardMarkup(
+            inline_keyboard=[
+                [
+                    InlineKeyboardButton(
+                        text="▶️ Давом этиш",
+                        callback_data=PauseCb(
+                            session_id=session_id, action="resume"
+                        ).pack(),
+                    )
+                ]
+            ]
+        )
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="⏸ Танaffus",
+                    callback_data=PauseCb(session_id=session_id, action="pause").pack(),
                 )
             ]
         ]

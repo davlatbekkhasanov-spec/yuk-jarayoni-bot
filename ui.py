@@ -6,6 +6,7 @@ import html as html_lib
 from typing import Any
 
 from time_util import display_now, elapsed_seconds, format_duration, now_iso
+from timer_util import is_paused, pause_seconds_total, work_seconds
 
 
 def he(text: object) -> str:
@@ -41,7 +42,7 @@ def masul_welcome(name: str) -> str:
         "📌 <b>Қадамлар:</b>\n"
         "1️⃣ <b>Юк келди</b> — машина ва тушириш жойи фотоси\n"
         "2️⃣ Гуруҳга хабар кетади, болалар <b>Қатнашиш</b> босади\n"
-        "3️⃣ Ҳар бирининг таймери ишлайди\n"
+        "3️⃣ Таймер + <b>⏸ Танaffus</b> / <b>▶️ Давом этиш</b>\n"
         "4️⃣ <b>Якунлаш</b> — охирги фотолар ва автоматик отчёт\n\n"
         f"<i>🕐 {he(display_now())}</i>"
     )
@@ -88,12 +89,16 @@ def group_load_card(
     else:
         lines.append("<code>┌─────────────────────</code>")
         for i, p in enumerate(participants, 1):
-            sec = elapsed_seconds(p.get("joined_at") or "")
+            sec = work_seconds(p)
             uname = p.get("username") or ""
             at = f" @{uname}" if uname else ""
             bar = timer_bar(sec)
+            if is_paused(p):
+                state = "⏸ <i>танaffus</i>"
+            else:
+                state = "🟢"
             lines.append(
-                f"<code>│</code> {i}. <b>{he(p.get('user_name'))}</b>{he(at)}\n"
+                f"<code>│</code> {i}. <b>{he(p.get('user_name'))}</b>{he(at)} {state}\n"
                 f"<code>│</code>    ⏱ <b>{format_duration(sec)}</b>  <code>{bar}</code>"
             )
         lines.append("<code>└─────────────────────</code>")
@@ -114,18 +119,33 @@ def group_load_card(
 def personal_timer_card(
     *,
     session: dict[str, Any],
-    user_name: str,
-    joined_at: str,
+    participant: dict[str, Any],
 ) -> str:
-    sec = elapsed_seconds(joined_at)
+    name = participant.get("user_name") or ""
+    sec = work_seconds(participant)
     bar = timer_bar(sec)
+    paused = is_paused(participant)
+    pause_sum = pause_seconds_total(participant)
+
+    if paused:
+        head = "⏸ <b>Танaffus</b>"
+        hint = "<i>Tаймер to‘xtatilgan. Tayyor bo‘lsangiz — «Давом этиш».</i>"
+    else:
+        head = "🟢 <b>Ish vaqti</b>"
+        hint = "<i>Tanaffus yoki boshqa ish — «⏸ Танaffus» bosing.</i>"
+
+    extra = ""
+    if pause_sum > 0:
+        extra = f"\n☕ <b>Jami tanaffus:</b> {format_duration(pause_sum)}"
+
     return (
-        "✅ <b>Сиз қатнашдингиз</b>\n\n"
+        f"{head}\n\n"
         f"🚚 Юк #{session['id']}\n"
-        f"👤 {he(user_name)}\n\n"
-        f"⏱ <b>Вақтингиз</b>\n"
+        f"👤 {he(name)}\n\n"
+        f"⏱ <b>Pure ish vaqti</b>\n"
         f"<code>{bar}</code>\n"
-        f"<b>{format_duration(sec)}</b>\n\n"
+        f"<b>{format_duration(sec)}</b>{extra}\n\n"
+        f"{hint}\n\n"
         f"<i>🕐 {he(display_now())}</i>"
     )
 
@@ -161,17 +181,13 @@ def final_report(
 
     if participants:
         for i, p in enumerate(participants, 1):
-            sec = elapsed_seconds(p.get("joined_at") or "")
-            if finished:
-                from time_util import parse_iso
-
-                end = parse_iso(finished)
-                start = parse_iso(p.get("joined_at") or "")
-                if end and start:
-                    sec = max(sec, int((end - start).total_seconds()))
+            sec = work_seconds(p, until_iso=finished)
+            pause_sec = pause_seconds_total(p, until_iso=finished)
+            tag = " ⏸" if p.get("paused_at") and finished else ""
+            pause_note = f" <i>(tanaffus {format_duration(pause_sec)})</i>" if pause_sec else ""
             lines.append(
-                f"<code>│</code> {i}. <b>{he(p.get('user_name'))}</b> — "
-                f"⏱ {format_duration(sec)}"
+                f"<code>│</code> {i}. <b>{he(p.get('user_name'))}</b>{tag} — "
+                f"⏱ {format_duration(sec)}{pause_note}"
             )
     else:
         lines.append("<code>│</code> <i>Қатнашувчи йўқ</i>")

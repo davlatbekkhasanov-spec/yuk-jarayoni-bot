@@ -11,3 +11,8 @@ class JoinCb(CallbackData, prefix="jn"):
 class FinishCb(CallbackData, prefix="fn"):
     session_id: int
     confirm: int = 0
+
+
+class PauseCb(CallbackData, prefix="ps"):
+    session_id: int
+    action: str  # pause | resume

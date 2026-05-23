@@ -12,11 +12,12 @@ from config import get_group_id, settings
 from services.group_check import GroupConfigError, verify_group_access
 from db import (
     get_active_session,
+    get_participant,
     get_session,
     list_participants,
     update_session,
 )
-from keyboards import group_join_closed, group_join_keyboard
+from keyboards import group_join_closed, group_join_keyboard, personal_timer_keyboard
 from time_util import now_iso
 from ui import final_report, group_load_card, personal_timer_card
 
@@ -94,29 +95,33 @@ async def refresh_group_status(bot: Bot, session_id: int, *, phase: str = "activ
         log.debug("edit group status: %s", e)
 
 
+async def refresh_personal_timer(bot: Bot, session_id: int, user_id: int) -> None:
+    session = get_session(session_id)
+    p = get_participant(session_id, user_id)
+    if not session or not p or not p.get("personal_msg_id"):
+        return
+    text = personal_timer_card(session=session, participant=p)
+    markup = personal_timer_keyboard(session_id, paused=bool(p.get("paused_at")))
+    try:
+        await bot.edit_message_text(
+            text=text,
+            chat_id=user_id,
+            message_id=p["personal_msg_id"],
+            parse_mode="HTML",
+            reply_markup=markup,
+        )
+    except Exception as e:
+        log.debug("edit personal timer uid=%s: %s", user_id, e)
+
+
 async def refresh_personal_timers(bot: Bot, session_id: int) -> None:
     session = get_session(session_id)
     if not session or session.get("status") != "active":
         return
 
     for p in list_participants(session_id):
-        msg_id = p.get("personal_msg_id")
-        if not msg_id:
-            continue
-        text = personal_timer_card(
-            session=session,
-            user_name=p.get("user_name") or "",
-            joined_at=p.get("joined_at") or "",
-        )
-        try:
-            await bot.edit_message_text(
-                text=text,
-                chat_id=p["user_id"],
-                message_id=msg_id,
-                parse_mode="HTML",
-            )
-        except Exception as e:
-            log.debug("edit personal timer uid=%s: %s", p.get("user_id"), e)
+        if p.get("personal_msg_id"):
+            await refresh_personal_timer(bot, session_id, int(p["user_id"]))
 
 
 async def publish_final_report(bot: Bot, session_id: int) -> None:

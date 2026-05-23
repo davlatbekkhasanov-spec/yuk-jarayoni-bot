@@ -34,6 +34,8 @@ CREATE TABLE IF NOT EXISTS participants (
     username TEXT,
     joined_at TEXT NOT NULL,
     personal_msg_id INTEGER,
+    pause_total_sec INTEGER NOT NULL DEFAULT 0,
+    paused_at TEXT,
     UNIQUE(session_id, user_id),
     FOREIGN KEY (session_id) REFERENCES load_sessions(id)
 );
@@ -62,9 +64,20 @@ def db():
         conn.close()
 
 
+def _migrate_participants(conn: sqlite3.Connection) -> None:
+    cols = {row[1] for row in conn.execute("PRAGMA table_info(participants)")}
+    if "pause_total_sec" not in cols:
+        conn.execute(
+            "ALTER TABLE participants ADD COLUMN pause_total_sec INTEGER NOT NULL DEFAULT 0"
+        )
+    if "paused_at" not in cols:
+        conn.execute("ALTER TABLE participants ADD COLUMN paused_at TEXT")
+
+
 def init_db() -> None:
     with db() as conn:
         conn.executescript(SCHEMA)
+        _migrate_participants(conn)
 
 
 def row_to_dict(row: sqlite3.Row | None) -> dict[str, Any] | None:
@@ -172,6 +185,61 @@ def update_participant_personal_msg(
             """,
             (personal_msg_id, session_id, user_id),
         )
+
+
+def get_participant(session_id: int, user_id: int) -> dict[str, Any] | None:
+    with db() as conn:
+        row = conn.execute(
+            "SELECT * FROM participants WHERE session_id=? AND user_id=?",
+            (session_id, user_id),
+        ).fetchone()
+        return row_to_dict(row)
+
+
+def pause_participant(session_id: int, user_id: int) -> bool:
+    from time_util import now_iso
+
+    with db() as conn:
+        row = conn.execute(
+            "SELECT paused_at FROM participants WHERE session_id=? AND user_id=?",
+            (session_id, user_id),
+        ).fetchone()
+        if not row or row["paused_at"]:
+            return False
+        conn.execute(
+            "UPDATE participants SET paused_at=? WHERE session_id=? AND user_id=?",
+            (now_iso(), session_id, user_id),
+        )
+        return True
+
+
+def resume_participant(session_id: int, user_id: int) -> bool:
+    from time_util import now_iso
+
+    with db() as conn:
+        row = conn.execute(
+            """
+            SELECT paused_at, pause_total_sec FROM participants
+            WHERE session_id=? AND user_id=?
+            """,
+            (session_id, user_id),
+        ).fetchone()
+        if not row or not row["paused_at"]:
+            return False
+        from time_util import parse_iso
+
+        start = parse_iso(row["paused_at"])
+        end = parse_iso(now_iso())
+        extra = max(0, int((end - start).total_seconds())) if start and end else 0
+        conn.execute(
+            """
+            UPDATE participants
+            SET paused_at=NULL, pause_total_sec=pause_total_sec+?
+            WHERE session_id=? AND user_id=?
+            """,
+            (extra, session_id, user_id),
+        )
+        return True
 
 
 def participant_exists(session_id: int, user_id: int) -> bool:
