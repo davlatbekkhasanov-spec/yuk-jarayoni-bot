@@ -9,24 +9,37 @@ TOKEN = os.getenv("BOT_TOKEN")
 bot = Bot(token=TOKEN)
 dp = Dispatcher()
 
+# ACTIVE LOAD
+active_users = []
 
+
+# START
 @dp.message(Command("start"))
 async def start(message: types.Message):
+
     await message.answer(
         "✅ Bot ishlayapti.\n\n"
-        "Buyruqlar:\n"
-        "/id - chat ID olish\n"
-        "/startload - yuk jarayonini boshlash"
+        "/id - chat id\n"
+        "/startload - yuk boshlash"
     )
 
 
+# GROUP ID
 @dp.message(Command("id"))
 async def get_id(message: types.Message):
-    await message.answer(f"📌 Chat ID:\n{message.chat.id}")
+
+    await message.answer(
+        f"📌 Chat ID:\n{message.chat.id}"
+    )
 
 
+# START LOAD
 @dp.message(Command("startload"))
 async def start_load(message: types.Message):
+
+    global active_users
+    active_users = []
+
     kb = InlineKeyboardMarkup(
         inline_keyboard=[
             [
@@ -38,22 +51,65 @@ async def start_load(message: types.Message):
         ]
     )
 
+    text = (
+        "🚚 ЮК КЕЛДИ\n\n"
+        "📸 Машина фото юборинг\n\n"
+        "👷 Қатнашувчилар:\n"
+        "Ҳозирча йўқ"
+    )
+
     await message.answer(
-        "🚚 Юк келди\n\n"
-        "📸 Машина фото юборинг",
+        text,
         reply_markup=kb
     )
 
 
+# JOIN
 @dp.callback_query()
 async def join_handler(callback: types.CallbackQuery):
+
+    global active_users
+
     user = callback.from_user.full_name
-    await callback.message.answer(f"✅ {user} қатнашди")
-    await callback.answer()
+
+    if user not in active_users:
+        active_users.append(user)
+
+    users_text = "\n".join(
+        [f"{i+1}. {name}" for i, name in enumerate(active_users)]
+    )
+
+    kb = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="✅ Қатнашиш",
+                    callback_data="join_load"
+                )
+            ]
+        ]
+    )
+
+    text = (
+        "🚚 ЮК КЕЛДИ\n\n"
+        "📸 Машина фото юборинг\n\n"
+        "👷 Қатнашувчилар:\n"
+        f"{users_text}"
+    )
+
+    await callback.message.edit_text(
+        text,
+        reply_markup=kb
+    )
+
+    await callback.answer("Сиз қатнашдингиз ✅")
 
 
+# MAIN
 async def main():
+
     print("Bot ishga tushdi...")
+
     await dp.start_polling(bot)
 
 
