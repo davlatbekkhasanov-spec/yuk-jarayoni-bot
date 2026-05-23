@@ -27,7 +27,6 @@ from ui import (
     media_caption_start,
     personal_timer_card,
     ranking_block,
-    report_caption_short,
 )
 
 log = logging.getLogger(__name__)
@@ -54,8 +53,8 @@ def _build_start_album(session: dict[str, Any], session_id: int) -> list[InputMe
     return media
 
 
-def _build_end_album(session: dict[str, Any]) -> list[InputMediaPhoto]:
-    """Yakun: faqat oxirgi 2 ta surat (boshidagi suratlar saqlanadi)."""
+def _build_end_album(session: dict[str, Any], session_id: int) -> list[InputMediaPhoto]:
+    """Yakun: faqat oxirgi 2 ta surat."""
     media: list[InputMediaPhoto] = []
     if session.get("car_photo_end"):
         media.append(
@@ -74,6 +73,40 @@ def _build_end_album(session: dict[str, Any]) -> list[InputMediaPhoto]:
             )
         )
     return media
+
+
+async def _send_end_album(
+    bot: Bot,
+    *,
+    chat_id: int,
+    session: dict[str, Any],
+    session_id: int,
+) -> None:
+    end_album = _build_end_album(session, session_id)
+    if not end_album:
+        log.warning("session %s: yakun suratlari yo'q", session_id)
+        return
+
+    cap = f"🏁  <b>YAKUN SURATLARI</b>  ·  #{session_id}"
+    end_album[0].caption = cap
+    end_album[0].parse_mode = "HTML"
+    if len(end_album) > 1:
+        end_album[1].caption = None
+
+    reply_to = session.get("group_album_msg_id") or session.get("group_status_msg_id")
+    kwargs: dict[str, Any] = {"chat_id": chat_id, "media": end_album[:10]}
+    if reply_to:
+        kwargs["reply_to_message_id"] = reply_to
+
+    try:
+        await bot.send_media_group(**kwargs)
+    except Exception as e:
+        log.warning("yakun albom reply bilan yuborilmadi: %s", e)
+        kwargs.pop("reply_to_message_id", None)
+        try:
+            await bot.send_media_group(**kwargs)
+        except Exception as e2:
+            log.error("yakun albom yuborilmadi: %s", e2)
 
 
 async def publish_load_to_group(bot: Bot, session_id: int) -> None:
@@ -139,7 +172,7 @@ async def refresh_group_status(
             reply_markup=markup,
         )
     except Exception as e:
-        log.debug("edit group status: %s", e)
+        log.warning("edit group status #%s: %s", session_id, e)
 
 
 async def refresh_personal_timer(bot: Bot, session_id: int, user_id: int) -> None:
@@ -185,48 +218,31 @@ async def publish_final_report(bot: Bot, session_id: int) -> None:
         session=session, participants=participants, finished_iso=finished_iso
     )
 
-    reply_to = session.get("group_status_msg_id")
-    caption = report_caption_short(session, participants)[:1020]
-
-    end_album = _build_end_album(session)
-    if end_album:
-        end_album[0].caption = caption
-        end_album[0].parse_mode = "HTML"
-        if len(end_album) > 1:
-            end_album[1].caption = None
-        await bot.send_media_group(
-            chat_id=group_id,
-            media=end_album[:10],
-            reply_to_message_id=reply_to,
-        )
-    elif reply_to:
-        await bot.send_message(
-            chat_id=group_id,
-            text=caption,
-            parse_mode="HTML",
-            reply_to_message_id=reply_to,
-        )
-    else:
-        await bot.send_message(chat_id=group_id, text=caption, parse_mode="HTML")
-
+    # 1) Status kartada Kaizen + JARAYON YAKUNLANDI
     await refresh_group_status(bot, session_id, phase="completed")
 
-    rank_kw: dict[str, Any] = {"parse_mode": "HTML"}
-    kaizen_kw: dict[str, Any] = {"parse_mode": "HTML"}
-    if reply_to:
-        rank_kw["reply_to_message_id"] = reply_to
-        kaizen_kw["reply_to_message_id"] = reply_to
+    # 2) Yakun 2 surat — boshidagi albomga reply (yuqoridagi 2 ta saqlanadi)
+    await _send_end_album(bot, chat_id=group_id, session=session, session_id=session_id)
 
-    await bot.send_message(
-        chat_id=group_id,
-        text=ranking_block(participants, finished_iso=finished_iso),
-        **rank_kw,
+    # 3) To'liq reyting + Kaizen — status xabariga reply
+    report_text = (
+        f"{ranking_block(participants, finished_iso=finished_iso)}\n\n"
+        f"{kaizen_block(m)}"
     )
-    await bot.send_message(
-        chat_id=group_id,
-        text=kaizen_block(m),
-        **kaizen_kw,
-    )
+    reply_status = session.get("group_status_msg_id")
+    msg_kw: dict[str, Any] = {
+        "chat_id": group_id,
+        "text": report_text,
+        "parse_mode": "HTML",
+    }
+    if reply_status:
+        msg_kw["reply_to_message_id"] = reply_status
+    try:
+        await bot.send_message(**msg_kw)
+    except Exception as e:
+        log.warning("hisobot reply bilan yuborilmadi: %s", e)
+        msg_kw.pop("reply_to_message_id", None)
+        await bot.send_message(**msg_kw)
 
 
 def active_session_for_user(user_id: int) -> dict[str, Any] | None:

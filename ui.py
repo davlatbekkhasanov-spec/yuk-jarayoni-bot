@@ -134,6 +134,8 @@ def group_load_card(
 
     active_n, paused_n, avg_sec = _team_stats(participants)
     cycle = elapsed_seconds(started) if started else 0
+    finished_iso = session.get("finished_at") or now_iso()
+    until = finished_iso if phase in ("finishing", "completed") else None
 
     lines = [
         banner(head_title, icon=head_icon),
@@ -145,7 +147,12 @@ def group_load_card(
     ]
 
     if participants:
-        sorted_p = sorted(participants, key=lambda p: work_seconds(p), reverse=True)
+        sort_key = (
+            (lambda p: work_seconds(p, until_iso=until))
+            if until
+            else work_seconds
+        )
+        sorted_p = sorted(participants, key=sort_key, reverse=True)
         lines.append(f"👷  <b>JAMOA</b>   {len(participants)} kishi")
         if phase == "active":
             lines.append(
@@ -155,7 +162,7 @@ def group_load_card(
         lines.append("")
         lines.append("<code>╭────────────────────────╮</code>")
         for i, p in enumerate(sorted_p, 1):
-            sec = work_seconds(p)
+            sec = work_seconds(p, until_iso=until) if until else work_seconds(p)
             if is_paused(p):
                 pulse, st = "⏸", "PAUZA"
             else:
@@ -185,6 +192,15 @@ def group_load_card(
                 f"<code>{glow_bar(min(100, cycle // 6), 16)}</code>",
             ]
         )
+
+    if phase == "completed":
+        m = compute_kaizen(
+            session=session,
+            participants=participants,
+            finished_iso=finished_iso,
+        )
+        lines.extend(["", kaizen_summary_compact(m)])
+        lines.append(f"\n<i>📸 Yakun suratlari — yuqoridagi albomga javob</i>")
 
     pulse = live_pulse()
     if phase in ("finishing", "completed"):
@@ -227,6 +243,19 @@ def personal_timer_card(
         f"<code>{timer_bar(sec, 16)}</code>{extra}\n\n"
         f"<i>{hint}</i>\n\n"
         f"<i>🕐 {he(display_now())}</i>"
+    )
+
+
+def kaizen_summary_compact(m: KaizenMetrics) -> str:
+    """Status kartasida ko'rinadigan qisqa Kaizen."""
+    return (
+        f"{sep()}\n"
+        f"📊  <b>KAIZEN</b>\n"
+        f"⏱  Jami tushirish: <b>{format_duration(m.cycle_sec)}</b>\n"
+        f"👤  O'rtacha / xodim: <b>{avg_minutes(m.avg_work_sec)}</b>\n"
+        f"👷  Jamoa ish vaqti: <b>{format_duration(m.total_work_sec)}</b>\n"
+        f"☕  Tanaffus: <b>{format_duration(m.total_pause_sec)}</b>\n"
+        f"{m.grade_icon}  Ball: <b>{m.kaizen_score}/100</b>  ·  <b>{he(m.grade)}</b>"
     )
 
 
