@@ -37,8 +37,15 @@ async def main() -> None:
     for warn in startup_warnings():
         log.warning(warn)
 
-    init_db()
+    added_ops = init_db()
     cfg = settings()
+    if cfg["masul_ids"]:
+        log.info(
+            "MASUL_IDS dan %s ta operator (deployda avtomatik tiklanadi)",
+            len(cfg["masul_ids"]),
+        )
+    if added_ops:
+        log.info("Operators jadvaliga yangi qo‘shildi: %s", added_ops)
     bot_probe = Bot(
         token=cfg["token"],
         default=DefaultBotProperties(parse_mode=ParseMode.HTML),

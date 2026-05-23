@@ -81,30 +81,48 @@ def _migrate_participants(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE participants ADD COLUMN paused_at TEXT")
 
 
-def _seed_operators_from_env(conn: sqlite3.Connection) -> None:
-    import os
-    from config import _parse_ids
+def sync_operators_from_env(conn: sqlite3.Connection | None = None) -> int:
+    """
+    Har ishga tushganda: ADMIN_ID + MASUL_IDS → operators.
+    Deploy DB yangilansa ham mas'ullar qayta tiklanadi.
+    """
+    from config import persistent_operator_ids
     from time_util import now_iso
 
-    raw = os.getenv("MASUL_IDS") or os.getenv("OPERATOR_IDS") or ""
-    for uid in _parse_ids(raw):
-        try:
-            conn.execute(
+    ids = persistent_operator_ids()
+    if not ids:
+        return 0
+
+    now = now_iso()
+
+    def _run(c: sqlite3.Connection) -> int:
+        n = 0
+        for uid in ids:
+            cur = c.execute(
                 """
-                INSERT OR IGNORE INTO operators (user_id, user_name, added_at, added_by)
+                INSERT INTO operators (user_id, user_name, added_at, added_by)
                 VALUES (?, ?, ?, NULL)
+                ON CONFLICT(user_id) DO NOTHING
                 """,
-                (uid, f"ID {uid}", now_iso()),
+                (uid, f"ID {uid}", now),
             )
-        except sqlite3.Error:
-            pass
+            if cur.rowcount:
+                n += 1
+        return n
+
+    if conn is not None:
+        return _run(conn)
+
+    with db() as c:
+        return _run(c)
 
 
-def init_db() -> None:
+def init_db() -> int:
+    """DB yaratadi; qaytaradi: env dan yangi qo‘shilgan operatorlar soni."""
     with db() as conn:
         conn.executescript(SCHEMA)
         _migrate_participants(conn)
-        _seed_operators_from_env(conn)
+        return sync_operators_from_env(conn)
 
 
 def row_to_dict(row: sqlite3.Row | None) -> dict[str, Any] | None:

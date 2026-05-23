@@ -50,7 +50,9 @@ async def add_op_start(message: Message, state: FSMContext) -> None:
         "1) Odamning xabarini <b>reply</b> qiling, yoki\n"
         "2) <code>123456789</code> — Telegram ID yozing, yoki\n"
         "3) Kontaktni <b>forward</b> qiling.\n\n"
-        "<i>Ularga «Юк келди» va «Якунлаш» ochiladi. Railway kerak emas.</i>",
+        "<i>Ularga «Юк келди» va «Якунлаш» ochiladi.</i>\n\n"
+        "💡 Doimiy saqlash: Railway → <code>MASUL_IDS=id1,id2</code> "
+        "(har deployda qayta tiklanadi).",
         parse_mode="HTML",
     )
 

@@ -52,6 +52,16 @@ def _resolve_group_id_from_env() -> int | None:
     return None
 
 
+def masul_ids_from_env() -> frozenset[int]:
+    """Deploydan keyin qayta tiklanadigan mas'ullar (Railway Variables)."""
+    return _parse_ids(os.getenv("MASUL_IDS") or os.getenv("OPERATOR_IDS") or "")
+
+
+def persistent_operator_ids() -> frozenset[int]:
+    """Har deployda avtomatik operators jadvaliga yoziladi."""
+    return settings()["admin_ids"] | masul_ids_from_env()
+
+
 @lru_cache(maxsize=1)
 def settings():
     token = (os.getenv("BOT_TOKEN") or "").strip()
@@ -64,6 +74,7 @@ def settings():
         "token": token,
         "group_id": group_id,
         "admin_ids": admin_ids,
+        "masul_ids": masul_ids_from_env(),
         "db_path": db_path,
         "tz": tz,
         "timer_tick": timer_tick,
