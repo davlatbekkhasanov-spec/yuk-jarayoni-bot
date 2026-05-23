@@ -7,7 +7,7 @@ from db import is_operator
 
 
 def can_manage_yuk(user_id: int | None) -> bool:
-    """Юк келди / якунлаш."""
+    """Yuk keldi / yakunlash."""
     if user_id is None:
         return False
     uid = int(user_id)
