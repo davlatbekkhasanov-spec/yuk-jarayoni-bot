@@ -6,7 +6,7 @@ import logging
 from typing import Any
 
 from aiogram import Bot
-from aiogram.types import InputMediaPhoto
+from aiogram.types import InputMediaPhoto, ReplyParameters
 
 from config import get_group_id
 from db import (
@@ -32,6 +32,19 @@ from ui import (
 log = logging.getLogger(__name__)
 
 
+def _album_reply_message_id(session: dict[str, Any]) -> int | None:
+    """Boshlang'ich albomning birinchi surat xabari ID."""
+    mid = session.get("group_album_msg_id")
+    if mid:
+        return int(mid)
+    raw = session.get("group_album_msg_ids")
+    if raw:
+        part = str(raw).split(",")[0].strip()
+        if part.isdigit():
+            return int(part)
+    return None
+
+
 def _build_start_album(session: dict[str, Any], session_id: int) -> list[InputMediaPhoto]:
     media: list[InputMediaPhoto] = []
     if session.get("car_photo_start"):
@@ -53,60 +66,61 @@ def _build_start_album(session: dict[str, Any], session_id: int) -> list[InputMe
     return media
 
 
-def _build_end_album(session: dict[str, Any], session_id: int) -> list[InputMediaPhoto]:
-    """Yakun: faqat oxirgi 2 ta surat."""
-    media: list[InputMediaPhoto] = []
-    if session.get("car_photo_end"):
-        media.append(
-            InputMediaPhoto(
-                media=session["car_photo_end"],
-                caption=media_caption_end("car"),
-                parse_mode="HTML",
-            )
-        )
-    if session.get("unload_photo_end"):
-        media.append(
-            InputMediaPhoto(
-                media=session["unload_photo_end"],
-                caption=media_caption_end("extra"),
-                parse_mode="HTML",
-            )
-        )
-    return media
-
-
-async def _send_end_album(
+async def _send_end_photos_reply(
     bot: Bot,
     *,
     chat_id: int,
     session: dict[str, Any],
     session_id: int,
 ) -> None:
-    end_album = _build_end_album(session, session_id)
-    if not end_album:
+    """
+    Yakun suratlari — boshidagi albomga reply.
+    Media group reply Telegramda ishonchsiz; alohida send_photo ishlatiladi.
+    """
+    reply_id = _album_reply_message_id(session)
+    items: list[tuple[str, str]] = []
+    if session.get("car_photo_end"):
+        items.append(("car", session["car_photo_end"]))
+    if session.get("unload_photo_end"):
+        items.append(("extra", session["unload_photo_end"]))
+    if not items:
         log.warning("session %s: yakun suratlari yo'q", session_id)
         return
 
-    cap = f"🏁  <b>YAKUN SURATLARI</b>  ·  #{session_id}"
-    end_album[0].caption = cap
-    end_album[0].parse_mode = "HTML"
-    if len(end_album) > 1:
-        end_album[1].caption = None
+    reply_params = (
+        ReplyParameters(message_id=reply_id) if reply_id else None
+    )
+    if not reply_params:
+        log.warning(
+            "session %s: group_album_msg_id yo'q — reply bo'lmaydi", session_id
+        )
 
-    reply_to = session.get("group_album_msg_id") or session.get("group_status_msg_id")
-    kwargs: dict[str, Any] = {"chat_id": chat_id, "media": end_album[:10]}
-    if reply_to:
-        kwargs["reply_to_message_id"] = reply_to
+    for i, (kind, file_id) in enumerate(items):
+        if i == 0:
+            caption = f"🏁  <b>YAKUN SURATLARI</b>  ·  #{session_id}"
+        else:
+            caption = media_caption_end(kind)
 
-    try:
-        await bot.send_media_group(**kwargs)
-    except Exception as e:
-        log.warning("yakun albom reply bilan yuborilmadi: %s", e)
-        kwargs.pop("reply_to_message_id", None)
+        kw: dict[str, Any] = {
+            "chat_id": chat_id,
+            "photo": file_id,
+            "caption": caption,
+            "parse_mode": "HTML",
+        }
+        if reply_params:
+            kw["reply_parameters"] = reply_params
+
         try:
-            await bot.send_media_group(**kwargs)
-        except Exception as e2:
-            log.error("yakun albom yuborilmadi: %s", e2)
+            await bot.send_photo(**kw)
+        except Exception as e:
+            log.warning(
+                "yakun surat reply bilan yuborilmadi (kind=%s, reply=%s): %s",
+                kind,
+                reply_id,
+                e,
+            )
+            kw.pop("reply_parameters", None)
+            await bot.send_photo(**kw)
 
 
 async def publish_load_to_group(bot: Bot, session_id: int) -> None:
@@ -124,6 +138,7 @@ async def publish_load_to_group(bot: Bot, session_id: int) -> None:
 
     album = await bot.send_media_group(chat_id=group_id, media=media[:10])
     album_ids = ",".join(str(m.message_id) for m in album)
+    first_id = album[0].message_id if album else None
 
     status_text = group_load_card(session=session, participants=[], phase="active")
     status_msg = await bot.send_message(
@@ -137,10 +152,16 @@ async def publish_load_to_group(bot: Bot, session_id: int) -> None:
         session_id,
         status="active",
         group_chat_id=group_id,
-        group_album_msg_id=album[0].message_id if album else None,
+        group_album_msg_id=first_id,
         group_album_msg_ids=album_ids,
         group_status_msg_id=status_msg.message_id,
         started_at=now_iso(),
+    )
+    log.info(
+        "session %s: bosh albom msg_id=%s ids=%s",
+        session_id,
+        first_id,
+        album_ids,
     )
 
 
@@ -218,13 +239,15 @@ async def publish_final_report(bot: Bot, session_id: int) -> None:
         session=session, participants=participants, finished_iso=finished_iso
     )
 
-    # 1) Status kartada Kaizen + JARAYON YAKUNLANDI
+    # 1) Yakun suratlari — bosh albomga reply (avval, statusdan oldin)
+    await _send_end_photos_reply(
+        bot, chat_id=group_id, session=session, session_id=session_id
+    )
+
+    # 2) Status + Kaizen kartasi
     await refresh_group_status(bot, session_id, phase="completed")
 
-    # 2) Yakun 2 surat — boshidagi albomga reply (yuqoridagi 2 ta saqlanadi)
-    await _send_end_album(bot, chat_id=group_id, session=session, session_id=session_id)
-
-    # 3) To'liq reyting + Kaizen — status xabariga reply
+    # 3) To'liq hisobot — status xabariga reply
     report_text = (
         f"{ranking_block(participants, finished_iso=finished_iso)}\n\n"
         f"{kaizen_block(m)}"
@@ -236,12 +259,12 @@ async def publish_final_report(bot: Bot, session_id: int) -> None:
         "parse_mode": "HTML",
     }
     if reply_status:
-        msg_kw["reply_to_message_id"] = reply_status
+        msg_kw["reply_parameters"] = ReplyParameters(message_id=int(reply_status))
     try:
         await bot.send_message(**msg_kw)
     except Exception as e:
         log.warning("hisobot reply bilan yuborilmadi: %s", e)
-        msg_kw.pop("reply_to_message_id", None)
+        msg_kw.pop("reply_parameters", None)
         await bot.send_message(**msg_kw)
 
 
