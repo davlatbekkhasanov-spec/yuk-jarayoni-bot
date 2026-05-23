@@ -19,11 +19,20 @@ def _parse_ids(raw: str) -> frozenset[int]:
     return frozenset(out)
 
 
+def _parse_group_id(raw: str) -> int | None:
+    raw = (raw or "").strip().strip('"').strip("'").strip()
+    if not raw:
+        return None
+    try:
+        return int(raw)
+    except ValueError:
+        return None
+
+
 @lru_cache(maxsize=1)
 def settings():
     token = (os.getenv("BOT_TOKEN") or "").strip()
-    group_raw = (os.getenv("GROUP_ID") or "").strip()
-    group_id = int(group_raw) if group_raw.lstrip("-").isdigit() else None
+    group_id = _parse_group_id(os.getenv("GROUP_ID") or "")
     admin_ids = _parse_ids(os.getenv("ADMIN_IDS") or os.getenv("ADMIN_ID") or "")
     db_path = (os.getenv("DB_PATH") or "yuk_bot.db").strip() or "yuk_bot.db"
     tz = (os.getenv("TZ") or "Asia/Tashkent").strip() or "Asia/Tashkent"

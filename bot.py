@@ -39,6 +39,21 @@ async def main() -> None:
 
     init_db()
     cfg = settings()
+    bot_probe = Bot(
+        token=cfg["token"],
+        default=DefaultBotProperties(parse_mode=ParseMode.HTML),
+    )
+    if cfg["group_id"]:
+        try:
+            from services.group_check import verify_group_access
+
+            title = await verify_group_access(bot_probe)
+            log.info("Guruh OK: %s (id=%s)", title, cfg["group_id"])
+        except Exception as e:
+            log.error("Guruh tekshiruvi: %s — /guruh yoki GROUP_ID ni tuzating", e)
+        finally:
+            await bot_probe.session.close()
+
     bot = Bot(
         token=cfg["token"],
         default=DefaultBotProperties(parse_mode=ParseMode.HTML),

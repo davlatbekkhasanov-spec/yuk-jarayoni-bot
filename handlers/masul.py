@@ -18,6 +18,7 @@ from db import (
     update_session,
 )
 from keyboards import cancel_inline, masul_finish_confirm, masul_main_menu
+from services.group_check import GroupConfigError, group_fix_message, verify_group_access
 from services.load_service import publish_final_report, publish_load_to_group, refresh_group_status
 from states import LoadFinishStates, LoadStartStates
 from time_util import now_iso
@@ -51,9 +52,15 @@ async def start_load_flow(message: Message, state: FSMContext) -> None:
     if not settings()["group_id"]:
         await message.answer(
             "⚠️ <b>GROUP_ID</b> sozlanmagan.\n"
-            "Guruhda /id oling va .env ga qo‘ying.",
+            "Guruhda /id oling va Railway Variables ga qo‘ying.",
             parse_mode="HTML",
         )
+        return
+
+    try:
+        await verify_group_access(message.bot)
+    except GroupConfigError:
+        await message.answer(group_fix_message(), parse_mode="HTML")
         return
 
     active = get_active_session()
@@ -117,12 +124,23 @@ async def start_unload_photo(message: Message, state: FSMContext, bot: Bot) -> N
 
     try:
         await publish_load_to_group(bot, sid)
+    except GroupConfigError as e:
+        log.warning("publish_load group: %s", e)
+        from db import abandon_session
+
+        abandon_session(sid)
+        await message.answer(group_fix_message(detail=str(e)), parse_mode="HTML")
+        await state.clear()
+        return
     except Exception as e:
         log.exception("publish_load")
         from db import abandon_session
 
         abandon_session(sid)
-        await message.answer(f"❌ Guruhga yuborib bo‘lmadi: {e}")
+        await message.answer(
+            group_fix_message(detail=str(e)[:200]),
+            parse_mode="HTML",
+        )
         await state.clear()
         return
 

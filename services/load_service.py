@@ -9,6 +9,7 @@ from aiogram import Bot
 from aiogram.types import InputMediaPhoto
 
 from config import settings
+from services.group_check import GroupConfigError, verify_group_access
 from db import (
     get_active_session,
     get_session,
@@ -28,7 +29,9 @@ async def publish_load_to_group(bot: Bot, session_id: int) -> None:
         raise ValueError("session not found")
     group_id = settings()["group_id"]
     if not group_id:
-        raise ValueError("GROUP_ID sozlanmagan")
+        raise GroupConfigError("GROUP_ID sozlanmagan")
+
+    await verify_group_access(bot)
 
     media = [
         InputMediaPhoto(

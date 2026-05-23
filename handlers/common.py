@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
-from aiogram import F, Router
+from aiogram import Bot, F, Router
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 
 from config import has_admins, is_admin, railway_setup_hint, settings
+from services.group_check import GroupConfigError, group_fix_message, parse_group_id_hint, verify_group_access
 from db import get_active_session
 from keyboards import masul_main_menu
 from ui import masul_welcome
@@ -48,16 +49,40 @@ async def cmd_start(message: Message, state: FSMContext) -> None:
 async def cmd_id(message: Message) -> None:
     uid = message.from_user.id if message.from_user else "—"
     extra = ""
-    if message.chat.type == "private" and not has_admins() and uid != "—":
+    if message.chat.type in ("group", "supergroup"):
         extra = (
-            f"\n\n⚙️ Railway uchun:\n"
-            f"<code>ADMIN_ID={uid}</code>"
+            "\n\n✅ <b>Shu raqamni</b> Railway → <code>GROUP_ID</code> ga qo‘ying.\n"
+            "<i>Bot guruhda bo‘lishi shart.</i>"
         )
+    elif message.chat.type == "private" and not has_admins() and uid != "—":
+        extra = f"\n\n⚙️ Railway uchun:\n<code>ADMIN_ID={uid}</code>"
     await message.answer(
         f"📌 <b>Chat ID</b>\n<code>{message.chat.id}</code>\n\n"
         f"👤 <b>Sizning ID</b>\n<code>{uid}</code>{extra}",
         parse_mode="HTML",
     )
+
+
+@router.message(Command("guruh"))
+async def cmd_check_group(message: Message, bot: Bot) -> None:
+    """Mas'ul: GROUP_ID to‘g‘riligini tekshiradi."""
+    if not is_admin(message.from_user.id if message.from_user else None):
+        await message.answer("⚠️ Faqat mas'ul uchun.", parse_mode="HTML")
+        return
+    if message.chat.type != "private":
+        await message.answer("Bu buyruqni <b>shaxsiy chatda</b> yuboring.", parse_mode="HTML")
+        return
+    try:
+        title = await verify_group_access(bot)
+        await message.answer(
+            f"✅ <b>Guruh topildi</b>\n\n"
+            f"📛 <b>{title}</b>\n"
+            f"{parse_group_id_hint()}\n\n"
+            "Endi <b>🚚 Юк келди</b> ishlashi kerak.",
+            parse_mode="HTML",
+        )
+    except GroupConfigError:
+        await message.answer(group_fix_message(), parse_mode="HTML")
 
 
 @router.callback_query(F.data == "ui:cancel")
