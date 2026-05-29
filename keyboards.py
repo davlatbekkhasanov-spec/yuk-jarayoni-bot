@@ -10,7 +10,6 @@ from aiogram.types import (
 )
 
 from callbacks import FinishCb, JoinCb, PauseCb
-from hub_test import BTN_HUB_TEST
 from texts import (
     BTN_HOLAT,
     BTN_MASUL_QOSH,
@@ -42,7 +41,6 @@ def masul_main_menu(*, can_finish: bool, show_staff: bool = False) -> ReplyKeybo
                 KeyboardButton(text=BTN_MASUL_QOSH),
             ]
         )
-        keyboard.append([KeyboardButton(text=BTN_HUB_TEST)])
     return ReplyKeyboardMarkup(
         keyboard=keyboard,
         resize_keyboard=True,
