@@ -19,13 +19,16 @@ from db import (
 from keyboards import group_join_closed, group_join_keyboard, personal_timer_keyboard
 from services.group_check import GroupConfigError, verify_group_access
 from time_util import now_iso
+from timer_util import work_seconds
 from ui import (
+    format_duration,
     group_load_card,
     media_caption_end,
     media_caption_start,
     personal_timer_card,
     ranking_block,
 )
+from yordamchi_push import push_to_yordamchi_hub_background
 
 log = logging.getLogger(__name__)
 
@@ -321,6 +324,17 @@ async def publish_final_report(bot: Bot, session_id: int) -> None:
         text=report_text,
         parse_mode="HTML",
     )
+
+    for p in participants:
+        uid = int(p.get("user_id") or 0)
+        if not uid:
+            continue
+        sec = work_seconds(p, until_iso=finished_iso)
+        push_to_yordamchi_hub_background(
+            tg_id=uid,
+            bot_key="yuk",
+            summary=f"Yuk #{session_id}: ish vaqti {format_duration(sec)}",
+        )
 
 
 def active_session_for_user(user_id: int) -> dict[str, Any] | None:
