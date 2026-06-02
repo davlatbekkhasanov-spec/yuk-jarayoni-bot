@@ -19,6 +19,7 @@ from config import settings, startup_warnings
 from db import init_db
 from handlers import setup_routers
 from handlers.common import ensure_configured
+from services.load_service import backfill_today_hub_summaries
 from services.ticker import TimerTicker
 
 logging.basicConfig(
@@ -46,6 +47,12 @@ async def main() -> None:
         )
     if added_ops:
         log.info("Operators jadvaliga yangi qo'shildi: %s", added_ops)
+    try:
+        sent, total = await backfill_today_hub_summaries()
+        if total:
+            log.info("Hub backfill today: %s/%s", sent, total)
+    except Exception as e:
+        log.warning("Hub backfill today failed: %s", e)
     bot_probe = Bot(
         token=cfg["token"],
         default=DefaultBotProperties(parse_mode=ParseMode.HTML),

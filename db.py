@@ -183,6 +183,22 @@ def get_session(session_id: int) -> dict[str, Any] | None:
         return row_to_dict(row)
 
 
+def list_finished_sessions_by_day(day_iso: str) -> list[dict[str, Any]]:
+    """Berilgan sana bo'yicha tugagan sessiyalar."""
+    day = (day_iso or "").strip()[:10]
+    with db() as conn:
+        rows = conn.execute(
+            """
+            SELECT * FROM load_sessions
+            WHERE status = 'finished'
+              AND finished_at LIKE ?
+            ORDER BY finished_at ASC, id ASC
+            """,
+            (f"{day}%",),
+        ).fetchall()
+        return [row_to_dict(r) for r in rows]
+
+
 def list_participants(session_id: int) -> list[dict[str, Any]]:
     with db() as conn:
         rows = conn.execute(

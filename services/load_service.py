@@ -13,6 +13,7 @@ from db import (
     get_active_session,
     get_participant,
     get_session,
+    list_finished_sessions_by_day,
     list_participants,
     update_session,
 )
@@ -28,9 +29,49 @@ from ui import (
     personal_timer_card,
     ranking_block,
 )
-from yordamchi_push import push_to_yordamchi_hub_background
+from yordamchi_push import push_to_yordamchi_hub, push_to_yordamchi_hub_background, today_iso
 
 log = logging.getLogger(__name__)
+
+
+def _daily_seconds_by_user(day_iso: str) -> dict[int, int]:
+    totals: dict[int, int] = {}
+    for s in list_finished_sessions_by_day(day_iso):
+        sid = int(s.get("id") or 0)
+        finished_iso = s.get("finished_at") or now_iso()
+        if not sid:
+            continue
+        for p in list_participants(sid):
+            uid = int(p.get("user_id") or 0)
+            if not uid:
+                continue
+            sec = work_seconds(p, until_iso=finished_iso)
+            totals[uid] = totals.get(uid, 0) + max(0, int(sec))
+    return totals
+
+
+async def backfill_today_hub_summaries() -> tuple[int, int]:
+    """
+    Bugungi tugagan yuk sessiyalaridan xodimlar bo'yicha jami vaqtni hub'ga qayta yuboradi.
+    Hech qanday guruh xabari yubormaydi.
+    """
+    day = today_iso()
+    totals = _daily_seconds_by_user(day)
+    sent = 0
+    for uid, sec in totals.items():
+        ok, via = await push_to_yordamchi_hub(
+            tg_id=uid,
+            bot_key="yuk",
+            summary=f"Yuk (bugun jami): ish vaqti {format_duration(sec)}",
+            day_iso=day,
+        )
+        if ok:
+            sent += 1
+        else:
+            log.warning("yuk hub backfill failed uid=%s: %s", uid, via)
+    if totals:
+        log.info("yuk hub backfill: %s/%s users for %s", sent, len(totals), day)
+    return sent, len(totals)
 
 
 def _reply_params(chat_id: int, message_id: int | None) -> ReplyParameters | None:
@@ -329,11 +370,14 @@ async def publish_final_report(bot: Bot, session_id: int) -> None:
         uid = int(p.get("user_id") or 0)
         if not uid:
             continue
-        sec = work_seconds(p, until_iso=finished_iso)
+        day = (finished_iso or "")[:10] or today_iso()
+        daily_totals = _daily_seconds_by_user(day)
+        sec = daily_totals.get(uid, 0)
         push_to_yordamchi_hub_background(
             tg_id=uid,
             bot_key="yuk",
-            summary=f"Yuk #{session_id}: ish vaqti {format_duration(sec)}",
+            summary=f"Yuk (bugun jami): ish vaqti {format_duration(sec)}",
+            day_iso=day,
         )
 
 
