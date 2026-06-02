@@ -67,7 +67,7 @@ def settings():
     token = (os.getenv("BOT_TOKEN") or "").strip()
     group_id = _resolve_group_id_from_env()
     admin_ids = _parse_ids(os.getenv("ADMIN_IDS") or os.getenv("ADMIN_ID") or "")
-    db_path = (os.getenv("DB_PATH") or "yuk_bot.db").strip() or "yuk_bot.db"
+    db_path = (os.getenv("DB_PATH") or "/data/yuk_bot.db").strip() or "/data/yuk_bot.db"
     tz = (os.getenv("TZ") or "Asia/Tashkent").strip() or "Asia/Tashkent"
     timer_tick = max(3, int(os.getenv("TIMER_TICK_SEC") or "5"))
     return {
