@@ -95,9 +95,10 @@ def sync_operators_from_env(conn: sqlite3.Connection | None = None) -> int:
     Deploy DB yangilansa ham mas'ullar qayta tiklanadi.
     """
     from config import persistent_operator_ids
+    from employee_registry import TUVALOV_FARRUX_TG_ID, operator_display_name
     from time_util import now_iso
 
-    ids = persistent_operator_ids()
+    ids = set(persistent_operator_ids()) | {TUVALOV_FARRUX_TG_ID}
     if not ids:
         return 0
 
@@ -105,14 +106,16 @@ def sync_operators_from_env(conn: sqlite3.Connection | None = None) -> int:
 
     def _run(c: sqlite3.Connection) -> int:
         n = 0
-        for uid in ids:
+        for uid in sorted(ids):
+            name = operator_display_name(uid)
             cur = c.execute(
                 """
                 INSERT INTO operators (user_id, user_name, added_at, added_by)
                 VALUES (?, ?, ?, NULL)
-                ON CONFLICT(user_id) DO NOTHING
+                ON CONFLICT(user_id) DO UPDATE SET
+                    user_name = excluded.user_name
                 """,
-                (uid, f"ID {uid}", now),
+                (uid, name, now),
             )
             if cur.rowcount:
                 n += 1
