@@ -5,6 +5,14 @@ from __future__ import annotations
 import os
 from functools import lru_cache
 
+from persist_data import bootstrap_persistence, resolve_db_path
+
+_DB_BOOT = bootstrap_persistence(
+    resolve_db_path(default_filename="yuk_bot.db"),
+    legacy_names=("yuk_bot.db",),
+)
+_RESOLVED_DB_PATH = _DB_BOOT["db_path"]
+
 
 def _parse_ids(raw: str) -> frozenset[int]:
     out: set[int] = set()
@@ -67,10 +75,7 @@ def settings():
     token = (os.getenv("BOT_TOKEN") or "").strip()
     group_id = _resolve_group_id_from_env()
     admin_ids = _parse_ids(os.getenv("ADMIN_IDS") or os.getenv("ADMIN_ID") or "")
-    db_path = (os.getenv("DB_PATH") or "/data/yuk_bot.db").strip() or "/data/yuk_bot.db"
-    db_dir = os.path.dirname(db_path)
-    if db_dir:
-        os.makedirs(db_dir, exist_ok=True)
+    db_path = _RESOLVED_DB_PATH
     tz = (os.getenv("TZ") or "Asia/Tashkent").strip() or "Asia/Tashkent"
     timer_tick = max(3, int(os.getenv("TIMER_TICK_SEC") or "5"))
     return {

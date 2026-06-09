@@ -15,7 +15,8 @@ from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 from aiogram.fsm.storage.memory import MemoryStorage
 
-from config import settings, startup_warnings
+from config import _RESOLVED_DB_PATH, settings, startup_warnings
+from persist_data import persistence_status_line
 from db import init_db
 from handlers import setup_routers
 from handlers.common import ensure_configured
@@ -38,6 +39,7 @@ async def main() -> None:
     for warn in startup_warnings():
         log.warning(warn)
 
+    log.info(persistence_status_line(_RESOLVED_DB_PATH))
     added_ops = init_db()
     cfg = settings()
     if cfg["masul_ids"]:
