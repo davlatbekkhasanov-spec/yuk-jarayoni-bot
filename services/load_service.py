@@ -97,17 +97,23 @@ def _user_yuk_seconds_today(
 
 
 async def push_live_session_hub(session_id: int) -> int:
-    """Faol yuk davomida analytics uchun jonli vaqtni hub'ga yuboradi."""
+    """
+    Faol sessiya davomida hub'ga faqat tugagan yuklar jami yuboriladi.
+    Ochiq taymer analyticsda 3+ soat ko'rinib ketmasligi uchun jonli vaqt qo'shilmaydi.
+    """
     session = get_session(session_id)
     if not session or session.get("status") != "active":
         return 0
     day = today_iso()
+    totals = _daily_seconds_by_user(day)
     sent = 0
-    for p in list_participants(session_id):
-        uid = int(p.get("user_id") or 0)
-        if not uid:
-            continue
-        sec = _user_yuk_seconds_today(uid, day, include_active_sid=session_id)
+    active_uids = {
+        int(p.get("user_id") or 0)
+        for p in list_participants(session_id)
+        if int(p.get("user_id") or 0)
+    }
+    for uid in active_uids:
+        sec = int(totals.get(uid, 0))
         if sec <= 0:
             continue
         ok, via = await push_to_yordamchi_hub(
