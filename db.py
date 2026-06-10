@@ -193,7 +193,7 @@ def list_finished_sessions_by_day(day_iso: str) -> list[dict[str, Any]]:
         rows = conn.execute(
             """
             SELECT * FROM load_sessions
-            WHERE status = 'finished'
+            WHERE status IN ('finished', 'completed')
               AND finished_at LIKE ?
             ORDER BY finished_at ASC, id ASC
             """,

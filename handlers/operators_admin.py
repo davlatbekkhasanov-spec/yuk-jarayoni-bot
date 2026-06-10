@@ -12,9 +12,11 @@ from config import is_admin
 from db import add_operator, get_active_session, list_operators, remove_operator
 from keyboards import masul_main_menu
 from roles import can_manage_yuk
+from services.load_service import backfill_hub_summaries
 from states import AddOperatorStates
 from texts import BTN_MASUL_QOSH_ALL, BTN_MASULLAR_ALL
 from ui import operators_list_text
+from yordamchi_push import hub_configured, today_iso
 
 router = Router()
 
@@ -107,6 +109,30 @@ async def add_op_save(message: Message, state: FSMContext) -> None:
         f"✅ <b>{name}</b> mas'ul qilindi.\n"
         f"<code>{target_id}</code>\n\n"
         "Endi u botda <b>Yuk keldi</b> va <b>Yakunlash</b> bosishi mumkin.",
+        parse_mode="HTML",
+        reply_markup=_menu(message.from_user.id),
+    )
+
+
+@router.message(F.text.regexp(r"^/hubbackfill(?:@\w+)?(?:\s+(\d{4}-\d{2}-\d{2}))?\s*$"), F.chat.type == "private")
+async def hub_backfill_cmd(message: Message) -> None:
+    if not is_admin(message.from_user.id):
+        await message.answer("⚠️ Faqat asosiy admin uchun.", parse_mode="HTML")
+        return
+    if not hub_configured():
+        await message.answer(
+            "⚠️ Hub sozlanmagan.\n"
+            "Railway: <code>YORDAMCHI_HUB_URL</code> + <code>YORDAMCHI_HUB_SECRET</code>",
+            parse_mode="HTML",
+        )
+        return
+    m = re.search(r"(\d{4}-\d{2}-\d{2})", message.text or "")
+    day = m.group(1) if m else today_iso()
+    sent, total = await backfill_hub_summaries(day)
+    await message.answer(
+        f"📡 <b>Hub backfill</b> — <code>{day}</code>\n"
+        f"Yuborildi: <b>{sent}</b> / {total} xodim\n\n"
+        "<i>Yordamchi botda /repairhub bosing.</i>",
         parse_mode="HTML",
         reply_markup=_menu(message.from_user.id),
     )

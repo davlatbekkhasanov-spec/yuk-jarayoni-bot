@@ -108,6 +108,15 @@ def startup_warnings() -> list[str]:
         warnings.append("ADMIN_ID yoki ADMIN_IDS sozlanmagan — mas'ul funksiyalari o'chiq")
     if not s["group_id"]:
         warnings.append("GROUP_ID sozlanmagan — guruhga e'lon yuborilmaydi")
+    hub_url = (os.getenv("YORDAMCHI_HUB_URL") or os.getenv("HUB_URL") or "").strip()
+    hub_secret = (
+        os.getenv("YORDAMCHI_HUB_SECRET") or os.getenv("HUB_SECRET") or ""
+    ).strip()
+    if not hub_url or not hub_secret:
+        warnings.append(
+            "YORDAMCHI_HUB_URL + YORDAMCHI_HUB_SECRET yo'q — "
+            "Kaizen analyticsda yuk vaqti ko'rinmaydi"
+        )
     return warnings
 
 

@@ -22,7 +22,6 @@ from services.group_check import GroupConfigError, verify_group_access
 from time_util import now_iso
 from timer_util import work_seconds
 from ui import (
-    format_duration,
     group_load_card,
     media_caption_end,
     media_caption_start,
@@ -50,19 +49,21 @@ def _daily_seconds_by_user(day_iso: str) -> dict[int, int]:
     return totals
 
 
-async def backfill_today_hub_summaries() -> tuple[int, int]:
+async def backfill_hub_summaries(day_iso: str | None = None) -> tuple[int, int]:
     """
-    Bugungi tugagan yuk sessiyalaridan xodimlar bo'yicha jami vaqtni hub'ga qayta yuboradi.
+    Tugagan yuk sessiyalaridan xodimlar bo'yicha jami vaqtni hub'ga qayta yuboradi.
     Hech qanday guruh xabari yubormaydi.
     """
-    day = today_iso()
+    day = (day_iso or today_iso()).strip()[:10]
     totals = _daily_seconds_by_user(day)
     sent = 0
     for uid, sec in totals.items():
+        if sec <= 0:
+            continue
         ok, via = await push_to_yordamchi_hub(
             tg_id=uid,
             bot_key="yuk",
-            summary=f"Yuk (bugun jami): ish vaqti {format_duration(sec)}",
+            summary=f"Yuk (bugun jami): ish vaqti {sec} soniya",
             day_iso=day,
         )
         if ok:
@@ -72,6 +73,54 @@ async def backfill_today_hub_summaries() -> tuple[int, int]:
     if totals:
         log.info("yuk hub backfill: %s/%s users for %s", sent, len(totals), day)
     return sent, len(totals)
+
+
+async def backfill_today_hub_summaries() -> tuple[int, int]:
+    return await backfill_hub_summaries(today_iso())
+
+
+def _user_yuk_seconds_today(
+    user_id: int, day_iso: str, *, include_active_sid: int | None = None
+) -> int:
+    """Bugungi tugagan yuklar + (ixtiyoriy) faol sessiyadagi jonli vaqt."""
+    sec = _daily_seconds_by_user(day_iso).get(int(user_id), 0)
+    if not include_active_sid:
+        return sec
+    session = get_session(int(include_active_sid))
+    if not session or session.get("status") != "active":
+        return sec
+    for p in list_participants(int(include_active_sid)):
+        if int(p.get("user_id") or 0) != int(user_id):
+            continue
+        sec += max(0, int(work_seconds(p)))
+    return sec
+
+
+async def push_live_session_hub(session_id: int) -> int:
+    """Faol yuk davomida analytics uchun jonli vaqtni hub'ga yuboradi."""
+    session = get_session(session_id)
+    if not session or session.get("status") != "active":
+        return 0
+    day = today_iso()
+    sent = 0
+    for p in list_participants(session_id):
+        uid = int(p.get("user_id") or 0)
+        if not uid:
+            continue
+        sec = _user_yuk_seconds_today(uid, day, include_active_sid=session_id)
+        if sec <= 0:
+            continue
+        ok, via = await push_to_yordamchi_hub(
+            tg_id=uid,
+            bot_key="yuk",
+            summary=f"Yuk (bugun jami): ish vaqti {sec} soniya",
+            day_iso=day,
+        )
+        if ok:
+            sent += 1
+        else:
+            log.debug("yuk live hub uid=%s: %s", uid, via)
+    return sent
 
 
 def _reply_params(chat_id: int, message_id: int | None) -> ReplyParameters | None:
@@ -371,12 +420,15 @@ async def publish_final_report(bot: Bot, session_id: int) -> None:
         if not uid:
             continue
         day = (finished_iso or "")[:10] or today_iso()
+        sec = work_seconds(p, until_iso=finished_iso)
         daily_totals = _daily_seconds_by_user(day)
-        sec = daily_totals.get(uid, 0)
+        sec = max(sec, daily_totals.get(uid, 0))
+        if sec <= 0:
+            continue
         push_to_yordamchi_hub_background(
             tg_id=uid,
             bot_key="yuk",
-            summary=f"Yuk (bugun jami): ish vaqti {format_duration(sec)}",
+            summary=f"Yuk (bugun jami): ish vaqti {sec} soniya",
             day_iso=day,
         )
 
