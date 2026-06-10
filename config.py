@@ -5,6 +5,11 @@ from __future__ import annotations
 import os
 from functools import lru_cache
 
+from employee_registry import (
+    BUILTIN_ADMIN_IDS,
+    DEFAULT_GROUP_ID,
+    builtin_masul_ids,
+)
 from persist_data import bootstrap_persistence, resolve_db_path
 
 _DB_BOOT = bootstrap_persistence(
@@ -57,7 +62,7 @@ def _resolve_group_id_from_env() -> int | None:
         val = _parse_group_id(os.getenv(key) or "")
         if val is not None:
             return val
-    return None
+    return DEFAULT_GROUP_ID
 
 
 def masul_ids_from_env() -> frozenset[int]:
@@ -65,16 +70,26 @@ def masul_ids_from_env() -> frozenset[int]:
     return _parse_ids(os.getenv("MASUL_IDS") or os.getenv("OPERATOR_IDS") or "")
 
 
+def resolved_admin_ids() -> frozenset[int]:
+    return BUILTIN_ADMIN_IDS | _parse_ids(
+        os.getenv("ADMIN_IDS") or os.getenv("ADMIN_ID") or ""
+    )
+
+
+def resolved_masul_ids() -> frozenset[int]:
+    return builtin_masul_ids() | masul_ids_from_env()
+
+
 def persistent_operator_ids() -> frozenset[int]:
     """Har deployda avtomatik operators jadvaliga yoziladi."""
-    return settings()["admin_ids"] | masul_ids_from_env()
+    return resolved_admin_ids() | resolved_masul_ids()
 
 
 @lru_cache(maxsize=1)
 def settings():
     token = (os.getenv("BOT_TOKEN") or "").strip()
     group_id = _resolve_group_id_from_env()
-    admin_ids = _parse_ids(os.getenv("ADMIN_IDS") or os.getenv("ADMIN_ID") or "")
+    admin_ids = resolved_admin_ids()
     db_path = _RESOLVED_DB_PATH
     tz = (os.getenv("TZ") or "Asia/Tashkent").strip() or "Asia/Tashkent"
     timer_tick = max(3, int(os.getenv("TIMER_TICK_SEC") or "5"))
@@ -82,7 +97,7 @@ def settings():
         "token": token,
         "group_id": group_id,
         "admin_ids": admin_ids,
-        "masul_ids": masul_ids_from_env(),
+        "masul_ids": resolved_masul_ids(),
         "db_path": db_path,
         "tz": tz,
         "timer_tick": timer_tick,

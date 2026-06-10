@@ -13,7 +13,13 @@ from zoneinfo import ZoneInfo
 
 log = logging.getLogger(__name__)
 
-HUB_URL = (os.getenv("YORDAMCHI_HUB_URL", "").strip() or os.getenv("HUB_URL", "").strip()).rstrip("/")
+DEFAULT_HUB_URL = "https://davlat-yordamchi-bot-production.up.railway.app"
+
+HUB_URL = (
+    os.getenv("YORDAMCHI_HUB_URL", "").strip()
+    or os.getenv("HUB_URL", "").strip()
+    or DEFAULT_HUB_URL
+).rstrip("/")
 HUB_SECRET = (
     os.getenv("YORDAMCHI_HUB_SECRET", "").strip()
     or os.getenv("HUB_SECRET", "").strip()

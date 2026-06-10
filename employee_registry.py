@@ -6,6 +6,16 @@ import re
 
 TUVALOV_FARRUX_TG_ID = 7703650930
 CANONICAL_TUVALOV = "Tuvalov Farrux"
+DAVLATBEK_ADMIN_ID = 1432810519
+DEFAULT_GROUP_ID = -1001877019294
+
+# Railway env yozmasdan ham ishlaydi (har deployda operators jadvaliga tiklanadi)
+BUILTIN_ADMIN_IDS: frozenset[int] = frozenset({DAVLATBEK_ADMIN_ID})
+
+
+def builtin_masul_ids() -> frozenset[int]:
+    """Jamoa + admin — yuk boshlash/yakunlash huquqi."""
+    return frozenset(TG_EMPLOYEE.keys()) | BUILTIN_ADMIN_IDS
 
 PULAT_LEGACY_NAMES: frozenset[str] = frozenset(
     {

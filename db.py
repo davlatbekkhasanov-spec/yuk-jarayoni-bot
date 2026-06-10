@@ -95,10 +95,10 @@ def sync_operators_from_env(conn: sqlite3.Connection | None = None) -> int:
     Deploy DB yangilansa ham mas'ullar qayta tiklanadi.
     """
     from config import persistent_operator_ids
-    from employee_registry import TUVALOV_FARRUX_TG_ID, operator_display_name
+    from employee_registry import operator_display_name
     from time_util import now_iso
 
-    ids = set(persistent_operator_ids()) | {TUVALOV_FARRUX_TG_ID}
+    ids = set(persistent_operator_ids())
     if not ids:
         return 0
 
