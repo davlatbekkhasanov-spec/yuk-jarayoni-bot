@@ -23,7 +23,7 @@ class TimerTicker:
         self._task: asyncio.Task | None = None
         self._stop = asyncio.Event()
         self._last_hub_push = 0.0
-        self._hub_push_interval = max(30, int(os.getenv("HUB_LIVE_PUSH_SEC") or "45"))
+        self._hub_push_interval = max(0, int(os.getenv("HUB_LIVE_PUSH_SEC") or "0"))
 
     async def start(self) -> None:
         if self._task and not self._task.done():
@@ -50,7 +50,7 @@ class TimerTicker:
                     sid = int(session["id"])
                     await refresh_group_status(self.bot, sid)
                     await refresh_personal_timers(self.bot, sid)
-                    if hub_configured():
+                    if hub_configured() and self._hub_push_interval > 0:
                         now = time.monotonic()
                         if now - self._last_hub_push >= self._hub_push_interval:
                             self._last_hub_push = now

@@ -63,7 +63,7 @@ async def backfill_hub_summaries(day_iso: str | None = None) -> tuple[int, int]:
         ok, via = await push_to_yordamchi_hub(
             tg_id=uid,
             bot_key="yuk",
-            summary=f"Yuk (bugun jami): ish vaqti {sec} soniya",
+            summary=f"Yuk (yakun): ish vaqti {sec} soniya",
             day_iso=day,
         )
         if ok:
@@ -97,36 +97,8 @@ def _user_yuk_seconds_today(
 
 
 async def push_live_session_hub(session_id: int) -> int:
-    """
-    Faol sessiya davomida hub'ga faqat tugagan yuklar jami yuboriladi.
-    Ochiq taymer analyticsda 3+ soat ko'rinib ketmasligi uchun jonli vaqt qo'shilmaydi.
-    """
-    session = get_session(session_id)
-    if not session or session.get("status") != "active":
-        return 0
-    day = today_iso()
-    totals = _daily_seconds_by_user(day)
-    sent = 0
-    active_uids = {
-        int(p.get("user_id") or 0)
-        for p in list_participants(session_id)
-        if int(p.get("user_id") or 0)
-    }
-    for uid in active_uids:
-        sec = int(totals.get(uid, 0))
-        if sec <= 0:
-            continue
-        ok, via = await push_to_yordamchi_hub(
-            tg_id=uid,
-            bot_key="yuk",
-            summary=f"Yuk (bugun jami): ish vaqti {sec} soniya",
-            day_iso=day,
-        )
-        if ok:
-            sent += 1
-        else:
-            log.debug("yuk live hub uid=%s: %s", uid, via)
-    return sent
+    """Jonli hub push o'chirilgan — analytics faqat sessiya yakuni (yakun) orqali."""
+    return 0
 
 
 def _reply_params(chat_id: int, message_id: int | None) -> ReplyParameters | None:
@@ -434,7 +406,7 @@ async def publish_final_report(bot: Bot, session_id: int) -> None:
         push_to_yordamchi_hub_background(
             tg_id=uid,
             bot_key="yuk",
-            summary=f"Yuk (bugun jami): ish vaqti {sec} soniya",
+            summary=f"Yuk (yakun): ish vaqti {sec} soniya",
             day_iso=day,
         )
 
