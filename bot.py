@@ -82,6 +82,9 @@ async def main() -> None:
     log.info("Bot ishga tushdi (GROUP_ID=%s)", cfg["group_id"])
 
     try:
+        from telegram_polling_guard import ensure_polling_mode
+
+        await ensure_polling_mode(bot)
         await dp.start_polling(bot)
     finally:
         await ticker.stop()
