@@ -103,6 +103,27 @@ def _user_yuk_seconds_today(
     return sec
 
 
+def _trip_count_today(*, session_id: int | None = None) -> int:
+    day = today_iso()
+    finished = len(list_finished_sessions_by_day(day))
+    if session_id:
+        session = get_session(int(session_id))
+        if session and session.get("status") in ("active", "finishing"):
+            return finished + 1
+    return max(finished, 1)
+
+
+def _session_meta(session_id: int) -> dict[str, int]:
+    return {
+        "session_id": int(session_id),
+        "trip_count": _trip_count_today(session_id=session_id),
+    }
+
+
+def session_hub_metadata(session_id: int) -> dict[str, int]:
+    return _session_meta(session_id)
+
+
 async def push_live_session_hub(session_id: int) -> int:
     """Faol yuk sessiyasi va qatnashuvchilarni jonli hub ga yuboradi."""
     session = get_session(session_id)
@@ -111,7 +132,7 @@ async def push_live_session_hub(session_id: int) -> int:
     n = 0
     masul_id = int(session.get("masul_id") or 0)
     masul_name = str(session.get("masul_name") or "")
-    meta = {"session_id": int(session_id)}
+    meta = _session_meta(int(session_id))
     if masul_id:
         push_session_start_background(
             tg_id=masul_id,
