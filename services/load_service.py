@@ -28,7 +28,14 @@ from ui import (
     personal_timer_card,
     ranking_block,
 )
-from yordamchi_push import push_to_yordamchi_hub, push_to_yordamchi_hub_background, today_iso
+from yordamchi_push import (
+    push_session_end_background,
+    push_session_start_background,
+    push_session_update_background,
+    push_to_yordamchi_hub,
+    push_to_yordamchi_hub_background,
+    today_iso,
+)
 
 log = logging.getLogger(__name__)
 
@@ -97,8 +104,54 @@ def _user_yuk_seconds_today(
 
 
 async def push_live_session_hub(session_id: int) -> int:
-    """Jonli hub push o'chirilgan — analytics faqat sessiya yakuni (yakun) orqali."""
-    return 0
+    """Faol yuk sessiyasi va qatnashuvchilarni jonli hub ga yuboradi."""
+    session = get_session(session_id)
+    if not session or session.get("status") != "active":
+        return 0
+    n = 0
+    masul_id = int(session.get("masul_id") or 0)
+    masul_name = str(session.get("masul_name") or "")
+    meta = {"session_id": int(session_id)}
+    if masul_id:
+        push_session_start_background(
+            tg_id=masul_id,
+            bot_key="yuk",
+            user_name=masul_name,
+            activity_type="yuk",
+            metadata=meta,
+        )
+        n += 1
+    for p in list_participants(session_id):
+        uid = int(p.get("user_id") or 0)
+        if not uid or uid == masul_id:
+            continue
+        st = "paused" if p.get("paused_at") else "active"
+        push_session_start_background(
+            tg_id=uid,
+            bot_key="yuk",
+            user_name=p.get("user_name") or "",
+            activity_type="yuk",
+            status=st,
+            metadata=meta,
+        )
+        n += 1
+    return n
+
+
+def push_live_session_end(session_id: int) -> None:
+    session = get_session(session_id)
+    if not session:
+        return
+    seen: set[int] = set()
+    masul_id = int(session.get("masul_id") or 0)
+    if masul_id:
+        push_session_end_background(tg_id=masul_id, bot_key="yuk", activity_type="yuk")
+        seen.add(masul_id)
+    for p in list_participants(session_id):
+        uid = int(p.get("user_id") or 0)
+        if uid and uid not in seen:
+            push_session_end_background(tg_id=uid, bot_key="yuk", activity_type="yuk")
+            seen.add(uid)
 
 
 def _reply_params(chat_id: int, message_id: int | None) -> ReplyParameters | None:
@@ -305,6 +358,7 @@ async def publish_load_to_group(bot: Bot, session_id: int) -> None:
         first_id,
         status_msg.message_id,
     )
+    await push_live_session_hub(session_id)
 
 
 async def refresh_group_status(
@@ -381,6 +435,8 @@ async def publish_final_report(bot: Bot, session_id: int) -> None:
     session = get_session(session_id) or session
 
     await refresh_group_status(bot, session_id, phase="completed")
+
+    push_live_session_end(session_id)
 
     await _send_session_photos(
         bot, chat_id=group_id, session=session, session_id=session_id

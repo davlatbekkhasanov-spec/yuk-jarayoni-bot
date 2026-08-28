@@ -17,10 +17,10 @@ from aiogram.fsm.storage.memory import MemoryStorage
 
 from config import _RESOLVED_DB_PATH, settings, startup_warnings
 from persist_data import persistence_status_line
-from db import init_db
+from db import get_active_session, init_db
 from handlers import setup_routers
 from handlers.common import ensure_configured
-from services.load_service import backfill_today_hub_summaries
+from services.load_service import backfill_today_hub_summaries, push_live_session_hub
 from services.ticker import TimerTicker
 
 logging.basicConfig(
@@ -55,6 +55,14 @@ async def main() -> None:
             log.info("Hub backfill today: %s/%s", sent, total)
     except Exception as e:
         log.warning("Hub backfill today failed: %s", e)
+    try:
+        active = get_active_session()
+        if active and active.get("status") == "active":
+            n = await push_live_session_hub(int(active["id"]))
+            if n:
+                log.info("Live hub sync: yuk #%s — %s kishi", active["id"], n)
+    except Exception as e:
+        log.warning("Live hub sync failed: %s", e)
     bot_probe = Bot(
         token=cfg["token"],
         default=DefaultBotProperties(parse_mode=ParseMode.HTML),

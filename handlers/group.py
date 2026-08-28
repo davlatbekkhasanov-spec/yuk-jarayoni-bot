@@ -19,8 +19,9 @@ from db import (
     update_participant_personal_msg,
 )
 from keyboards import personal_timer_keyboard
-from services.load_service import refresh_group_status
+from services.load_service import push_live_session_hub, refresh_group_status
 from ui import personal_timer_card
+from yordamchi_push import push_session_start_background, push_session_update_background
 
 router = Router()
 log = logging.getLogger(__name__)
@@ -96,6 +97,14 @@ async def on_join(callback: CallbackQuery, callback_data: JoinCb, bot: Bot) -> N
         )
         return
 
+    push_session_start_background(
+        tg_id=user.id,
+        bot_key="yuk",
+        user_name=name,
+        activity_type="yuk",
+        metadata={"session_id": int(callback_data.session_id)},
+    )
+
     await refresh_group_status(bot, callback_data.session_id)
     await callback.answer("✅ Qatnashdingiz! Shaxsiy chatda taymer ochiq", show_alert=False)
 
@@ -130,6 +139,16 @@ async def on_pause_toggle(
     else:
         await callback.answer()
         return
+
+    st = "paused" if action == "pause" else "active"
+    push_session_update_background(
+        tg_id=user.id,
+        bot_key="yuk",
+        user_name=user.full_name or user.username or "",
+        activity_type="yuk",
+        status=st,
+        metadata={"session_id": int(callback_data.session_id)},
+    )
 
     await _send_or_update_personal(bot, callback_data.session_id, user.id)
     await refresh_group_status(bot, callback_data.session_id)
