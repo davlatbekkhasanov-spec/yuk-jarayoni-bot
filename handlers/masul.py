@@ -21,7 +21,7 @@ from db import (
 from keyboards import cancel_inline, masul_finish_confirm, masul_main_menu
 from roles import can_manage_yuk
 from services.group_check import GroupConfigError, group_fix_message, verify_group_access
-from services.load_service import publish_final_report, publish_load_to_group, refresh_group_status
+from services.load_service import publish_final_report, publish_load_to_group, push_live_session_end, refresh_group_status
 from states import LoadFinishStates, LoadStartStates
 from texts import (
     BTN_HOLAT_ALL,
@@ -142,12 +142,14 @@ async def start_extra_photo(message: Message, state: FSMContext, bot: Bot) -> No
         await publish_load_to_group(bot, sid)
     except GroupConfigError as e:
         log.warning("publish_load group: %s", e)
+        push_live_session_end(sid)
         abandon_session(sid)
         await message.answer(group_fix_message(detail=str(e)), parse_mode="HTML")
         await state.clear()
         return
     except Exception as e:
         log.exception("publish_load")
+        push_live_session_end(sid)
         abandon_session(sid)
         await message.answer(
             group_fix_message(detail=str(e)[:200]),
